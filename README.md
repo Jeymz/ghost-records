@@ -98,9 +98,6 @@ Each run creates a timestamped directory with:
 
 **Prevent recurrence** — Add DNS cleanup to IaC teardown so records and addresses are destroyed in the same operation.
 
-## Authors
-
-Jai Sharma, Tom McCarthy — GoDaddy
 
 ## License
 
