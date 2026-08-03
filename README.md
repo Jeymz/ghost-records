@@ -1,6 +1,6 @@
 # Ghost Records
 
-Dangling DNS detection for AWS Elastic IPs. Finds Route53 A and CNAME records pointing at Elastic IPs your account no longer owns — the highest-impact vector for subdomain takeover on AWS.
+Dangling DNS detection for AWS Elastic IPs. Finds Route53 A and CNAME records pointing at Elastic IPs your accounts no longer own — the highest-impact vector for subdomain takeover on AWS. Cross-account aware: scans multiple AWS accounts and checks DNS records against the combined EIP inventory.
 
 ## The Problem
 
@@ -15,8 +15,8 @@ Ghost Records audits your Route53 zones against your EIP inventory and flags two
 
 ## How It Works
 
-1. **EIP Inventory** — Enumerates every Elastic IP across all regions in the account and resolves the resource behind it (EC2 instance, Lambda ENI, NAT Gateway, ELB ENI).
-2. **Route53 Cross-Reference** — Walks every public hosted zone, evaluates each A and CNAME record against the EIP inventory.
+1. **EIP Inventory** — Enumerates every Elastic IP across all regions in every scanned account and resolves the resource behind it (EC2 instance, Lambda ENI, NAT Gateway, ELB ENI). When multiple profiles are given, EIPs are collected into a single global inventory before any DNS evaluation.
+2. **Route53 Cross-Reference** — Walks every public hosted zone, evaluates each A and CNAME record against the global EIP inventory. Cross-account matches (DNS in Account A pointing to an EIP in Account B) are identified and annotated.
 3. **CNAME Chain Resolution** — CNAME targets are resolved from Route53 records first (not external DNS), so dangling IPs behind CNAME chains are correctly detected even when `dig` returns NXDOMAIN.
 
 Non-routable IPs (`0.0.0.0`, RFC 1918, loopback, link-local) are automatically skipped.

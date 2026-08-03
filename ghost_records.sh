@@ -209,7 +209,7 @@ collect_region_eips() {
     fi
 
     echo "$ip" >> "$eips_file"
-    echo "${ip}|${rtype} ${attached} (${region})|${alloc}|${region}|${status}" >> "$map_file"
+    echo "${ip}|${rtype} ${attached} (${region})|${alloc}|${region}|${status}|${acct}" >> "$map_file"
     printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
       "$acct" "$region" "$ip" "$alloc" "$attached" "$rtype" "$nametag" "$status" >> "$csv_file"
   done
@@ -218,8 +218,15 @@ collect_region_eips() {
 }
 
 # =============================================================================
-# MAIN — PER PROFILE
+# PHASE 1: GLOBAL EIP INVENTORY (all profiles)
 # =============================================================================
+GLOBAL_EIPS="$OUTPUT_DIR/.eips_global"
+GLOBAL_EIPMAP="$OUTPUT_DIR/.eipmap_global"
+GLOBAL_DNS_LOOKUP="$OUTPUT_DIR/.dns_lookup_global"
+VALID_PROFILES="$OUTPUT_DIR/.valid_profiles"
+: > "$GLOBAL_EIPS"; : > "$GLOBAL_EIPMAP"
+: > "$GLOBAL_DNS_LOOKUP"; : > "$VALID_PROFILES"
+
 for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
   [[ -z "$CURRENT_PROFILE" ]] && continue
 
@@ -234,15 +241,13 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
   log "Identity: $(echo "$CALLER" | jq -r '.Arn')"
   inc accounts
 
+  echo "${CURRENT_PROFILE}|${ACCOUNT_ID}" >> "$VALID_PROFILES"
   ACCT_JSON="$OUTPUT_DIR/raw_json/${ACCOUNT_ID}"; mkdir -p "$ACCT_JSON"
 
-  # ═══ PHASE 1: EIP INVENTORY ═══════════════════════════════════════════════
-  phase "PHASE 1: Elastic IP Inventory [$ACCOUNT_ID]"
+  phase "Elastic IP Inventory [$ACCOUNT_ID]"
 
-  EIPS="$OUTPUT_DIR/.eips_${ACCOUNT_ID}"
-  EIPMAP="$OUTPUT_DIR/.eipmap_${ACCOUNT_ID}"
   EIPFAIL="$OUTPUT_DIR/.eipfail_${ACCOUNT_ID}"
-  : > "$EIPS"; : > "$EIPMAP"; : > "$EIPFAIL"
+  : > "$EIPFAIL"
 
   if [[ "$REGIONS_INPUT" == "all" ]]; then
     REGION_LIST=$(timeout 15s aws --profile "$CURRENT_PROFILE" \
@@ -257,16 +262,15 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
 
   JOBS=0
   for region in $REGION_LIST; do
-    collect_region_eips "$region" "$EIPS" "$EIPMAP" "$CSV_EIP" "$ACCOUNT_ID" "$EIPFAIL" &
+    collect_region_eips "$region" "$GLOBAL_EIPS" "$GLOBAL_EIPMAP" "$CSV_EIP" "$ACCOUNT_ID" "$EIPFAIL" &
     JOBS=$((JOBS+1)); inc regions
     if [[ "$JOBS" -ge "$MAX_PARALLEL" ]]; then wait -n 2>/dev/null || wait; JOBS=$((JOBS-1)); fi
   done
   wait
   echo ""
 
-  sort -u "$EIPS" -o "$EIPS"
-  EIP_COUNT=$(wc -l < "$EIPS" 2>/dev/null | tr -d ' '); EIP_COUNT=${EIP_COUNT:-0}
-  IDLE_COUNT=$(grep '|IDLE$' "$EIPMAP" 2>/dev/null | wc -l | tr -d ' '); IDLE_COUNT=${IDLE_COUNT:-0}
+  EIP_COUNT=$(grep "|${ACCOUNT_ID}$" "$GLOBAL_EIPMAP" 2>/dev/null | wc -l | tr -d ' '); EIP_COUNT=${EIP_COUNT:-0}
+  IDLE_COUNT=$(grep "|IDLE|${ACCOUNT_ID}$" "$GLOBAL_EIPMAP" 2>/dev/null | wc -l | tr -d ' '); IDLE_COUNT=${IDLE_COUNT:-0}
   FAILED_COUNT=$(wc -l < "$EIPFAIL" 2>/dev/null | tr -d ' '); FAILED_COUNT=${FAILED_COUNT:-0}
   ST_eips=$(( $ST_eips + EIP_COUNT ))
   ST_eips_idle=$(( $ST_eips_idle + IDLE_COUNT ))
@@ -278,16 +282,29 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
     warn "$FAILED_COUNT region(s) failed to enumerate: $(tr '\n' ' ' < "$EIPFAIL")"
     warn "EIPs in those regions are MISSING from inventory — findings may be false positives."
   fi
+  rm -f "$EIPFAIL"
+done
 
-  # ═══ PHASE 2: ROUTE53 CROSS-REFERENCE ════════════════════════════════════
-  phase "PHASE 2: Route53 Cross-Reference [$ACCOUNT_ID]"
+sort -u "$GLOBAL_EIPS" -o "$GLOBAL_EIPS"
+TOTAL_EIPS=$(wc -l < "$GLOBAL_EIPS" 2>/dev/null | tr -d ' '); TOTAL_EIPS=${TOTAL_EIPS:-0}
+TOTAL_ACCOUNTS=$(wc -l < "$VALID_PROFILES" 2>/dev/null | tr -d ' '); TOTAL_ACCOUNTS=${TOTAL_ACCOUNTS:-0}
+if [[ "$TOTAL_ACCOUNTS" -gt 1 ]]; then
+  log "Global EIP inventory: ${BOLD}$TOTAL_EIPS${RESET} unique IP(s) across $TOTAL_ACCOUNTS account(s)"
+fi
+
+# =============================================================================
+# PHASE 2: ROUTE53 CROSS-REFERENCE (against global EIP inventory)
+# =============================================================================
+while IFS='|' read -r CURRENT_PROFILE ACCOUNT_ID; do
+  [[ -z "$CURRENT_PROFILE" ]] && continue
+
+  ACCT_JSON="$OUTPUT_DIR/raw_json/${ACCOUNT_ID}"
+
+  phase "Route53 Cross-Reference [$ACCOUNT_ID]"
 
   ZONES=$(timeout 15s aws --profile "$CURRENT_PROFILE" route53 list-hosted-zones --output json 2>/dev/null || echo '{"HostedZones":[]}')
   echo "$ZONES" > "$ACCT_JSON/hosted_zones.json"
   log "$(echo "$ZONES" | jq '.HostedZones | length') hosted zone(s)"
-
-  DNS_LOOKUP="$OUTPUT_DIR/.dns_lookup_${ACCOUNT_ID}"
-  : > "$DNS_LOOKUP"
 
   while IFS=$'\t' read -r zid zname zpriv; do
     [[ -z "$zid" ]] && continue
@@ -298,7 +315,6 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
     echo -e "\n  ${BOLD}▶ Zone: $ZDISP${RESET} ($ZID)"
     if [[ "$zpriv" == "true" ]]; then log "  Private zone — skipping"; continue; fi
 
-    # Paginate record sets
     RECORDS=""; TOKEN=""; PAGE=0; PREV_TOKEN=""
     while true; do
       PAGE=$((PAGE+1))
@@ -319,17 +335,13 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
     done
     echo "$RECORDS" > "$ACCT_JSON/zone_${ZID}_records.jsonl"
 
-    # Build A-record lookup so CNAMEs pointing at same-zone records resolve
-    # from Route53 data rather than relying on external DNS (which returns
-    # NXDOMAIN when the target IP is dangling/released).
     echo "$RECORDS" | jq -r '
       select(.Type == "A" and (.AliasTarget | not))
       | (.Name | rtrimstr(".")) as $n
       | .ResourceRecords[].Value
-      | ($n + "|" + .)' 2>/dev/null >> "$DNS_LOOKUP"
+      | ($n + "|" + .)' 2>/dev/null >> "$GLOBAL_DNS_LOOKUP"
 
-    # ── Evaluate one IP against the EIP inventory ──
-    eval_ip() {  # rname rtype ip origin
+    eval_ip() {
       local rname="$1" rtype="$2" ip="$3" origin="$4"
       case "$ip" in
         0.0.0.0|10.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|192.168.*|127.*|169.254.*)
@@ -337,32 +349,34 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
           echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,SKIPPED,non-routable-ip" >> "$CSV_MAP"
           return ;;
       esac
-      if grep -qxF "$ip" "$EIPS" 2>/dev/null; then
-        local line res alloc reg stat
-        line=$(grep "^${ip}|" "$EIPMAP" | head -1)
+      if grep -qxF "$ip" "$GLOBAL_EIPS" 2>/dev/null; then
+        local line res alloc reg stat eip_acct xacct=""
+        line=$(grep "^${ip}|" "$GLOBAL_EIPMAP" | head -1)
         res=$(echo "$line" | cut -d'|' -f2)
         alloc=$(echo "$line" | cut -d'|' -f3)
         reg=$(echo "$line" | cut -d'|' -f4)
         stat=$(echo "$line" | cut -d'|' -f5)
+        eip_acct=$(echo "$line" | cut -d'|' -f6)
+        [[ "$eip_acct" != "$ACCOUNT_ID" ]] && xacct=" [owner: $eip_acct]"
         if [[ "$stat" == "IDLE" ]]; then
-          warn "$rname -> $ip [AT-RISK — EIP allocated but not attached]"
+          warn "$rname -> $ip [AT-RISK — EIP allocated but not attached]$xacct"
           printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
             "$rname" "$rtype" "$ip" "$ZDISP" "$ACCOUNT_ID" "$alloc" "$reg" \
-            "eip-allocated-but-idle-release-would-create-takeover" >> "$CSV_ATRISK"
-          echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,AT-RISK,$res" >> "$CSV_MAP"
+            "eip-allocated-but-idle${xacct:+ (owner: $eip_acct)}" >> "$CSV_ATRISK"
+          echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,AT-RISK,$res${xacct}" >> "$CSV_MAP"
           inc at_risk
         else
-          ok "$rname -> $ip — $res"
-          echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,OK,$res" >> "$CSV_MAP"
+          ok "$rname -> $ip — $res$xacct"
+          echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,OK,$res${xacct}" >> "$CSV_MAP"
           inc matched
         fi
       else
         local ptr detail
         ptr=$(dig +short -x "$ip" 2>/dev/null | head -1); ptr="${ptr%.}"
-        detail="ip-not-an-eip-in-this-account"
+        detail="ip-not-in-any-scanned-account"
         [[ -n "$ptr" ]] && detail="${detail}(PTR:$ptr)"
         [[ -n "$origin" ]] && detail="${detail}(via:$origin)"
-        vuln "$rname -> $ip [DANGLING — not an EIP in this account]"
+        vuln "$rname -> $ip [DANGLING — not an EIP in any scanned account]"
         printf '%s,%s,%s,%s,%s,%s\n' \
           "$rname" "$rtype" "$ip" "$ZDISP" "$ACCOUNT_ID" "$detail" >> "$CSV_DANGLING"
         echo "$rname,$rtype,$ip,$ZDISP,$ACCOUNT_ID,DANGLING,$detail" >> "$CSV_MAP"
@@ -398,16 +412,13 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
           CVAL="${CVAL%.}"
           [[ -z "$CVAL" ]] && continue
 
-          # Check Route53 records first — dig returns NXDOMAIN for dangling
-          # IPs, hiding the actual target IP we need to evaluate.
-          R53_IPS=$(grep "^${CVAL}|" "$DNS_LOOKUP" 2>/dev/null | cut -d'|' -f2)
+          R53_IPS=$(grep "^${CVAL}|" "$GLOBAL_DNS_LOOKUP" 2>/dev/null | cut -d'|' -f2)
           if [[ -n "$R53_IPS" ]]; then
             while read -r rip; do
               [[ -z "$rip" ]] && continue
               eval_ip "$RNAME" "CNAME" "$rip" "$CVAL"
             done <<< "$R53_IPS"
           else
-            # Target not in Route53 — fall back to DNS resolution
             RESOLVED=$(dig +short "$CVAL" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -5)
             if [[ -z "$RESOLVED" ]]; then
               if dig "$CVAL" 2>/dev/null | grep -q "NXDOMAIN"; then
@@ -435,8 +446,9 @@ for CURRENT_PROFILE in "${PROFILE_ARRAY[@]}"; do
 
   done < <(echo "$ZONES" | jq -r '.HostedZones[] | [.Id, .Name, (.Config.PrivateZone|tostring)] | @tsv' 2>/dev/null)
 
-  rm -f "$EIPS" "$EIPMAP" "$EIPFAIL" "$DNS_LOOKUP"
-done
+done < "$VALID_PROFILES"
+
+rm -f "$GLOBAL_EIPS" "$GLOBAL_EIPMAP" "$GLOBAL_DNS_LOOKUP" "$VALID_PROFILES"
 
 SCAN_END=$(date +%s); DURATION=$(( SCAN_END - SCAN_START ))
 
@@ -506,7 +518,7 @@ SCAN_END=$(date +%s); DURATION=$(( SCAN_END - SCAN_START ))
 
   echo "## Remediation"
   echo ""
-  echo "**Dangling — act now.** The IP is outside your account and can be claimed by"
+  echo "**Dangling — act now.** The IP is outside your scanned accounts and can be claimed by"
   echo "anyone allocating Elastic IPs in that region. Delete the DNS record, or"
   echo "re-allocate the address if the service is still needed."
   echo ""
