@@ -335,11 +335,11 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 
 ## Approval Status
 
-**T3 Complete — T4 Awaiting Selection and Approval**
+**T4 Complete — T5 Awaiting Selection and Approval**
 
 ## Implementation Notes
 
-Implementation is underway on `feat-ghost_records_v2_implementation`. T1 and T2 are committed as individual scoped tasks; T3 has completed validation and its scoped commit is pending. Later tasks remain gated by their documented approvals and prerequisites.
+Implementation is underway on `feat-ghost_records_v2_implementation`. T1, T2, and T3 are committed as individual scoped tasks; T4 has completed validation and its scoped commit is pending. Later tasks remain gated by their documented approvals and prerequisites.
 
 ## Change Summary
 
@@ -440,7 +440,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** Standalone MySQL integration tests; compatible PXC test plan/fixture or supported-environment integration path; migration repeatability/rollback-path tests; architecture checks rejecting raw SQL/direct driver access outside approved infrastructure.
 - **Predecessors:** T2 and explicit Sequelize/MySQL schema approval.
 
-#### T4: Define canonical domain schemas and adapter contracts
+#### T4: [x] Define canonical domain schemas and adapter contracts
 
 - **Objective:** Make provider data, DNS observations, coverage events, findings, and jobs unambiguous before any provider implementation.
 - **Specific changes:** Implement centrally validated canonical objects for provider accounts, zones, records, DNS observations, ownership evidence, coverage events, scan jobs, findings, and artifacts. Define provider-adapter and ownership-adapter interfaces with typed success, partial, and failure outcomes.
@@ -612,8 +612,9 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 
 - [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task is committed as `703690a`. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
 - [x] **T2 — Implement centralized configuration, errors, and structured redaction.** Strict AJV schemas, a centralized allowlisted configuration loader, normalized immutable configuration, typed errors, structured redaction, logical-source logging, and focused unit/security-review coverage are complete.
-- [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete; the task commit is pending.
-- [ ] **T4–T20 and T15A — Pending.**
+- [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete as `cbe294b`.
+- [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete; the task commit is pending.
+- [ ] **T5–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -646,9 +647,20 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed; `npm audit` reports two accepted moderate UUID advisory entries and no high or critical vulnerability. |
 | Scope boundary | No domain schema migration, provider adapter, DNS query, HTTP listener, API route, authentication, container, Kubernetes, or CI behavior was introduced. |
 
+### T4 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Canonical boundary | Added a centralized strict AJV registry for provider accounts, DNS zones/records/observations, ownership evidence, coverage events, scan jobs, findings, and scan artifacts. Every boundary object has `additionalProperties: false`; successful validation returns an immutable structured-data copy. |
+| Adapter contract | Added provider and ownership adapter wrappers that validate inbound collection/evidence requests and typed outputs. Provider outcomes are discriminated `success`, `partial`, or `failure` objects; a successful empty inventory requires explicit complete coverage, while partial and failed outcomes require corresponding coverage evidence. |
+| Failure fidelity | Added typed coverage reasons, including authorization, throttling, malformed response, and pagination. Provider failures cannot be represented as empty successful inventories. |
+| Test evidence | Added sanitized fixtures and AJV tests for valid, malformed, and unknown-field boundary data; valid success/partial/failure outcomes; authorization and pagination failures; provider mismatch; and malformed partial coverage. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 54 passing tests; the opt-in owner-provided database integration test remains skipped locally. |
+| Scope boundary | No AWS SDK/provider dependency, provider credential handling, live DNS query, adapter collection implementation, persistence schema change, HTTP endpoint, authentication change, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T3 Complete — T4 Awaiting Selection and Approval**
+**T4 Complete — T5 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment
