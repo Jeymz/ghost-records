@@ -1,1 +1,11 @@
 ghost_records_*/
+
+# JavaScript tooling output
+node_modules/
+dist/
+coverage/
+
+# Local runtime configuration
+.env
+.env.*
+!.env.example

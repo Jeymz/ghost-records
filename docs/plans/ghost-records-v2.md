@@ -322,7 +322,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [x] Confirm that the enabled control plane uses local authentication/authorization by default and does not permit anonymous access; external AuthN/AuthZ is an explicit owner configuration.
 - [ ] Approve the V2 architecture decisions, including ADR-001 through ADR-004.
 - [ ] Obtain explicit implementation approval for the package layout, dependencies, MySQL/Sequelize schema, provider integrations, optional control-plane/API/UI, CI/container changes, and all public contracts.
-- [ ] Initialize the isolated JavaScript ES-module package and repository scripts.
+- [x] Initialize the isolated JavaScript ES-module package and repository scripts.
 - [ ] Implement central configuration, AJV schemas, structured logging/redaction, error taxonomy, and tests.
 - [ ] Define canonical schemas and adapter contracts.
 - [ ] Implement and test the Route 53 adapter with coverage reporting.
@@ -416,7 +416,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 
 ### 5. Task Breakdown
 
-#### T1: Create the isolated v2 JavaScript foundation
+#### T1: [x] Create the isolated v2 JavaScript foundation
 
 - **Objective:** Establish a JavaScript ES-module package boundary and repository-defined validation commands without touching the legacy scanner.
 - **Specific changes:** Add the approved v2 package structure, Node.js 22-compatible package metadata, minimal package scripts, test runner/linter configuration, and placeholder module boundaries for worker and control-plane roles. Record the chosen package location and scripts in this document. Do not introduce scanning, HTTP, database, provider, or container behavior.
@@ -610,11 +610,23 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 
 ## Task Status
 
-All tasks T1–T20 are **Pending**. No application code, dependency, runtime, schema, API, UI, or deployment configuration has been introduced by this planning update.
+- [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task commit is pending. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
+- [ ] **T2 — Implement centralized configuration, errors, and structured redaction.**
+- [ ] **T3–T20 and T15A — Pending.**
+
+### T1 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Foundation | Added a JavaScript ES-module package, React/Vite placeholder UI, and explicit worker/control-plane module boundaries. |
+| Validation | Added repository-defined `lint`, `test:run`, `coverage`, `build`, and `audit` scripts. Vitest is configured with Istanbul coverage reports. |
+| Test evidence | `npm run audit`, `npm run lint`, `npm run test:run`, `npm run coverage`, and `npm run build` all passed. The baseline test suite contains two tests with 100% Istanbul coverage of the initial source modules. |
+| Compatibility boundary | `ghost_records.sh` has no v2 diff; no scanner behavior changed. |
+| Scope boundary | No HTTP listener, API route, database/persistence code, DNS/provider integration, authentication, container, Kubernetes, or CI configuration was introduced. |
 
 ## Approval Status
 
-**Task-Level Plan Ready for Review**
+**T1 Complete — T2 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment
