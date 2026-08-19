@@ -323,7 +323,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [ ] Approve the V2 architecture decisions, including ADR-001 through ADR-004.
 - [ ] Obtain explicit implementation approval for the package layout, dependencies, MySQL/Sequelize schema, provider integrations, optional control-plane/API/UI, CI/container changes, and all public contracts.
 - [x] Initialize the isolated JavaScript ES-module package and repository scripts.
-- [ ] Implement central configuration, AJV schemas, structured logging/redaction, error taxonomy, and tests.
+- [x] Implement central configuration, AJV schemas, structured logging/redaction, error taxonomy, and tests.
 - [ ] Define canonical schemas and adapter contracts.
 - [ ] Implement and test the Route 53 adapter with coverage reporting.
 - [ ] Implement bounded DNS evidence collection and tests.
@@ -424,7 +424,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** Run the defined package scripts; verify the legacy file has no diff; perform an initial dependency and supply-chain review.
 - **Predecessors:** Formal implementation approval and explicit package/dependency approval.
 
-#### T2: Implement centralized configuration, errors, and structured redaction
+#### T2: [x] Implement centralized configuration, errors, and structured redaction
 
 - **Objective:** Create the trusted application boundary for runtime configuration and error/log handling.
 - **Specific changes:** Add one centralized configuration loader; AJV schemas for environment/config inputs; typed error taxonomy; logical-source structured logger; secret redaction; and configuration validation for DNS-only mode, external MySQL, provider credentials, pool limits, retention limits, and disabled-by-default control-plane settings.
@@ -610,8 +610,8 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 
 ## Task Status
 
-- [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task commit is pending. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
-- [ ] **T2 — Implement centralized configuration, errors, and structured redaction.**
+- [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task is committed as `703690a`. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
+- [x] **T2 — Implement centralized configuration, errors, and structured redaction.** Strict AJV schemas, a centralized allowlisted configuration loader, normalized immutable configuration, typed errors, structured redaction, logical-source logging, and focused unit/security-review coverage are complete.
 - [ ] **T3–T20 and T15A — Pending.**
 
 ### T1 Completion Record
@@ -624,9 +624,18 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Compatibility boundary | `ghost_records.sh` has no v2 diff; no scanner behavior changed. |
 | Scope boundary | No HTTP listener, API route, database/persistence code, DNS/provider integration, authentication, container, Kubernetes, or CI configuration was introduced. |
 
+### T2 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Configuration boundary | Added strict centralized AJV validation for allowed runtime configuration, including DNS-only enforcement, disabled-by-default control-plane configuration, database/pool settings, retention settings, and provider credential references. |
+| Error and logging boundary | Added typed configuration/validation errors, safe serialized error details, logical-source structured logging, HTTP record-shape support, and recursive redaction for passwords, API/access keys, credentials, tokens, sessions, cookies, and authorization fields. |
+| Test and review evidence | Added ten T2-focused tests; the complete suite has 12 passing tests. `npm run audit`, `npm run lint`, `npm run test:run`, `npm run coverage`, and `npm run build` pass. The focused review is recorded in `Secure Code Review - 2026-08-19.md`, including three remediated code-anchored findings. |
+| Scope boundary | No database connection, raw SQL, provider adapter, DNS query, HTTP listener, API route, authentication, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T1 Complete — T2 Awaiting Selection and Approval**
+**T2 Complete — T3 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

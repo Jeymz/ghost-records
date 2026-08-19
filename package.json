@@ -18,6 +18,7 @@
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
