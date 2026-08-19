@@ -378,3 +378,268 @@ Planning validation completed: the specification reflects the supplied engineeri
 [11] [Percona, *Percona XtraDB Cluster 8.4 Documentation*](https://docs.percona.com/percona-xtradb-cluster/8.4/index.html)
 
 [12] [Percona, *Percona XtraDB Cluster 8.0 Documentation*](https://docs.percona.com/percona-xtradb-cluster/8.0/index.html)
+
+
+## Implementation Plan
+
+### 1. Feature Summary
+
+Ghost Records v2 will be built as a new JavaScript ES-module application beside the retained Bash legacy utility. The current tracked repository contains only the legacy `ghost_records.sh`, `README.md`, `.gitignore`, and this specification. The v1 script is a direct AWS CLI/JQ/DIG workflow with Route 53 and Elastic IP behavior concentrated in one file; it must remain unchanged while v2 establishes a modular provider, DNS, ownership, persistence, reporting, and optional control-plane architecture.
+
+### 2. Relevant Existing Architecture
+
+| Area | Repository-confirmed state | Planning consequence |
+| --- | --- | --- |
+| Legacy scanner | `ghost_records.sh` performs AWS profile, EIP, Route 53, A/CNAME, and `dig`-based checks in one Bash file. | Preserve it as an unchanged legacy reference; do not migrate or refactor it in place. |
+| Current build/test scaffold | No JavaScript package, test framework, migration framework, container definition, CI configuration, or web application exists. | T1 must introduce the isolated v2 scaffold before any domain behavior. |
+| Current output model | V1 writes local Markdown/CSV and an optional minimal JSON summary. | V2 must define and test the canonical finding/artifact contract rather than inherit v1 CSV assumptions. |
+| Existing deployment behavior | No container/Kubernetes/GitLab implementation is present. | Container, Kubernetes, and CI work is a late, explicitly approved implementation task. |
+| Approved v2 contract | `docs/plans/ghost-records-v2.md` defines JavaScript-only, Sequelize-only MySQL persistence, DNS-only inspection, explicit coverage states, and optional secured REST/UI control plane behavior. | Every task must satisfy the specification acceptance criteria and constitution before later tasks depend on it. |
+
+### 3. Proposed Approach
+
+The safest implementation path is to build the v2 application in thin vertical slices. The first slice establishes the JavaScript/validation/logging/persistence boundaries without scanning. The second establishes canonical DNS and provider contracts, then proves them with the Route 53 adapter. Subsequent slices add DNS-only resolution, ownership and retention evidence, deterministic analysis, reporting, multi-instance coordination, the optional control plane, and provider adapters in the approved order. The legacy Bash utility remains untouched and serves only as a behavior reference.
+
+Every task is independently reviewable. A task may begin only after all listed predecessors are complete and its required approval gate remains satisfied. The implementation workflow will execute one task at a time; discovery of a material discrepancy between a task and this specification stops implementation and returns the plan to review.
+
+### 4. Impacted Areas
+
+| Area | Expected scope |
+| --- | --- |
+| `ghost_records.sh` | Explicitly out of scope for v2 feature code; no behavior change. |
+| `README.md` | Later documentation updates must distinguish legacy v1 from v2 and document approved deployment/configuration behavior. |
+| `docs/plans/ghost-records-v2.md` | Maintains task status, implementation notes, modified-file list, and post-task validation evidence. |
+| New v2 package area | Introduced only after approval; contains JavaScript ES modules, AJV schemas, Sequelize infrastructure, worker/control-plane modules, tests, and repository package scripts. |
+| New tests/fixtures area | Introduced with the relevant task; includes provider fixtures, DNS fixtures, database integration coverage, security regressions, and artifact snapshots. |
+| New documentation/reports area | Threat-model and secure-code-review reports are review artifacts; future product documentation is task-scoped. |
+| Container/CI/Kubernetes configuration | Deferred to T23 and must not be introduced incidentally by earlier tasks. |
+
+### 5. Task Breakdown
+
+#### T1: Create the isolated v2 JavaScript foundation
+
+- **Objective:** Establish a JavaScript ES-module package boundary and repository-defined validation commands without touching the legacy scanner.
+- **Specific changes:** Add the approved v2 package structure, Node.js 22-compatible package metadata, minimal package scripts, test runner/linter configuration, and placeholder module boundaries for worker and control-plane roles. Record the chosen package location and scripts in this document. Do not introduce scanning, HTTP, database, provider, or container behavior.
+- **Definition of done:** The repository has a deterministic JavaScript ES-module entrypoint and documented scripts; `ghost_records.sh` remains byte-for-byte unchanged.
+- **Expected tests / validation:** Run the defined package scripts; verify the legacy file has no diff; perform an initial dependency and supply-chain review.
+- **Predecessors:** Formal implementation approval and explicit package/dependency approval.
+
+#### T2: Implement centralized configuration, errors, and structured redaction
+
+- **Objective:** Create the trusted application boundary for runtime configuration and error/log handling.
+- **Specific changes:** Add one centralized configuration loader; AJV schemas for environment/config inputs; typed error taxonomy; logical-source structured logger; secret redaction; and configuration validation for DNS-only mode, external MySQL, provider credentials, pool limits, retention limits, and disabled-by-default control-plane settings.
+- **Definition of done:** Feature modules do not read `process.env` directly; invalid configuration fails closed before worker activity; confidential fields are redacted in error/log test cases.
+- **Expected tests / validation:** Unit tests for required/invalid/unknown configuration, schema rejection, redaction, and error serialization; secure-code review focused on secrets, logging, and configuration.
+- **Predecessors:** T1.
+
+#### T3: Establish Sequelize-only MySQL infrastructure and migration lifecycle
+
+- **Objective:** Create the owner-provisioned MySQL 8.0+/compatible-PXC persistence boundary.
+- **Specific changes:** Add Sequelize initialization, a repository/model boundary, connection/TLS/pool configuration, controlled single-writer migration runner, migration tracking, health/readiness checks, and connection-budget validation based on configured replica limits. Do not provision MySQL or introduce raw SQL/direct-driver feature access.
+- **Definition of done:** The application validates owner-provided MySQL connectivity and supports controlled migrations using Sequelize only; no bundled database or infrastructure provisioning capability exists.
+- **Expected tests / validation:** Standalone MySQL integration tests; compatible PXC test plan/fixture or supported-environment integration path; migration repeatability/rollback-path tests; architecture checks rejecting raw SQL/direct driver access outside approved infrastructure.
+- **Predecessors:** T2 and explicit Sequelize/MySQL schema approval.
+
+#### T4: Define canonical domain schemas and adapter contracts
+
+- **Objective:** Make provider data, DNS observations, coverage events, findings, and jobs unambiguous before any provider implementation.
+- **Specific changes:** Implement centrally validated canonical objects for provider accounts, zones, records, DNS observations, ownership evidence, coverage events, scan jobs, findings, and artifacts. Define provider-adapter and ownership-adapter interfaces with typed success, partial, and failure outcomes.
+- **Definition of done:** All boundary objects reject unexpected properties by default and provider failures cannot be represented as an empty successful inventory.
+- **Expected tests / validation:** JSON-schema/AJV fixture tests for valid, malformed, unknown-field, partial-coverage, authorization-failure, and pagination-failure scenarios.
+- **Predecessors:** T2 and T3 where persisted types are required.
+
+#### T5: Implement Route 53 collection with explicit coverage reporting
+
+- **Objective:** Prove the provider-adapter contract through a read-only AWS Route 53 implementation.
+- **Specific changes:** Add Route 53 credential/config handling, hosted-zone and record pagination, public/private visibility handling, A/AAAA/CNAME/MX/NS/alias normalization, account/zone/record evidence, and typed coverage events. Use read-only operations only.
+- **Definition of done:** Route 53 produces normalized records or explicit coverage gaps for inaccessible scopes, authentication failures, throttling, malformed responses, and pagination faults.
+- **Expected tests / validation:** Recorded/sanitized API fixtures for normal pages, repeated/absent tokens, empty zones, private zones, authorization denial, throttling, malformed data, and partial scans. Verify there is no provider mutation request path.
+- **Predecessors:** T4 and approved AWS SDK/dependency choice.
+
+#### T6: Implement bounded DNS-only resolution evidence collection
+
+- **Objective:** Collect DNS chain and terminal-answer evidence without HTTP/TLS/application probing.
+- **Specific changes:** Add normalized hostname handling, bounded A/AAAA/CNAME resolution, resolver outcome taxonomy, recursion/query/concurrency/response/time limits, chain cycle handling, TTL capture, and private/reserved-address classification. Persist only through approved repositories when required.
+- **Definition of done:** The resolver records declared target, chain, terminal answers, status, and observation time while classifying NXDOMAIN, NODATA, SERVFAIL, timeout, and coverage gaps distinctly.
+- **Expected tests / validation:** Deterministic resolver fixtures for CNAME loops, multi-value/IPv6 answers, resolver errors, wildcard/split-horizon assumptions, depth/query limits, and DNS-only egress architecture tests proving no HTTP/TLS/application target path exists.
+- **Predecessors:** T3 and T4.
+
+#### T7: Implement AWS ownership evidence and approved-external policy
+
+- **Objective:** Add the initial ownership/context layer needed to distinguish owned, approved external, unknown, unavailable, and not-found targets.
+- **Specific changes:** Implement read-only AWS Elastic IP/resource inventory evidence, approved-external target policy records, policy owner/reason/scope/expiry requirements, and coverage-aware ownership classification.
+- **Definition of done:** Unknown or inaccessible inventory is never reported as confirmed claimability; expired policy exceptions stop suppressing findings.
+- **Expected tests / validation:** Fixtures for owned, idle EIP, cross-account, missing-account, unavailable inventory, approved external, expired policy, and unowned cases. Review read-only IAM credential documentation.
+- **Predecessors:** T3, T4, and T5.
+
+#### T8: Persist CNAME history, registration observations, and configurable retention
+
+- **Objective:** Implement the durable evidence needed for CNAME terminal-IP drift and minimized WHOIS/RDAP history.
+- **Specific changes:** Add Sequelize models/repositories/migrations for resolution snapshots, registration observations, policy decisions, finding history, and retention metadata. Add bounded/idempotent leased retention jobs, disabled-by-default raw-evidence capture, and centrally validated retention configuration.
+- **Definition of done:** The system identifies terminal-IP/chain drift from persisted observations, retains minimized registration evidence with provenance, and purges according to owner-configured policy without logging deleted sensitive content.
+- **Expected tests / validation:** Migration tests, retention boundary tests, concurrent purge lease tests, drift/no-baseline tests, raw-evidence-disabled tests, and data-access authorization tests where the control-plane domain is introduced.
+- **Predecessors:** T3, T4, T6, and T7.
+
+#### T9: Implement deterministic analyzers and finding lifecycle
+
+- **Objective:** Turn canonical evidence into explainable DNS-only findings.
+- **Specific changes:** Implement analyzers for `coverage_incomplete`, `unknown_external_target`, `resolution_failure`, `dns_drift`, `released_eip_candidate`, `takeover_candidate`, `delegation_risk`, and `mail_routing_risk`; add evidence references, confidence, first/last seen, severity, suppression state, remediation, and lifecycle transitions.
+- **Definition of done:** No analyzer reports a confirmed takeover solely from DNS or inventory; findings retain sufficient evidence and coverage context for review.
+- **Expected tests / validation:** Rule-table fixtures covering benign CDN/load-balancer drift, expected change windows, ambiguous external dependencies, EIP cases, CNAME failures, delegation/mail cases, and incomplete coverage.
+- **Predecessors:** T5 through T8.
+
+#### T10: Implement authoritative storage and scan-report artifacts
+
+- **Objective:** Deliver the agreed MySQL-backed finding history plus JSON and Markdown/CSV artifacts.
+- **Specific changes:** Persist authoritative findings/history, generate schema-versioned JSON artifacts and Markdown/CSV reports, add artifact retention/access metadata, and reconcile artifact output to the stored finding state. Do not add SARIF.
+- **Definition of done:** Each completed scan has an authoritative stored result and artifacts that reconcile to it; logs are observability evidence rather than the findings authority.
+- **Expected tests / validation:** Artifact schema/snapshot tests, reconciliation tests, retention tests, and redaction tests for reporting/error paths.
+- **Predecessors:** T8 and T9.
+
+#### T11: Implement multi-instance scan-job coordination
+
+- **Objective:** Make worker execution correct for both a single process and multiple Kubernetes replicas.
+- **Specific changes:** Add leased/idempotent scan jobs, safe retry/expiry behavior, concurrency controls, scan state transitions, and metrics/audit events using Sequelize transactions and the shared MySQL store.
+- **Definition of done:** A task executes once per intended lease, expired workers can be recovered safely, and concurrent instances do not corrupt baselines or duplicate authoritative results.
+- **Expected tests / validation:** Multi-worker integration tests, lease-expiry/retry tests, idempotency tests, pool-budget validation, and operational metric checks.
+- **Predecessors:** T3, T8, T9, and T10.
+
+#### T12: Implement control-plane foundation with disabled-by-default exposure
+
+- **Objective:** Add the optional REST API and web UI hosting boundary without enabling it by default.
+- **Specific changes:** Add Express application composition, strict Helmet/CSP baseline, request/application logging contract, centralized AJV middleware, rate limiting, error boundaries, static UI hosting boundary, and startup refusal when enabled configuration is incomplete.
+- **Definition of done:** A disabled control plane opens no administrative listener; an enabled one enforces centralized validation, logging, and security middleware before business logic.
+- **Expected tests / validation:** Startup configuration tests, middleware-order tests, CSP/Helmet header tests, malformed request rejection, rate-limit tests, request-log linkage tests, and security architecture review.
+- **Predecessors:** T1, T2, T3, T10, and explicit HTTP/API/UI/dependency approval.
+
+#### T13: Implement local authentication and server-side authorization
+
+- **Objective:** Deliver the default control-plane identity strategy securely.
+- **Specific changes:** Add local users, roles/permissions/role bindings, Argon2id password storage, bootstrap/admin lifecycle, generic authentication failures, throttling, secure session/token controls, CSRF protection for cookie workflows, audit events, and server-side authorization enforcement for findings/policy/configuration actions.
+- **Definition of done:** The enabled control plane defaults to local authentication; anonymous access is impossible; authorization is enforced independent of UI state.
+- **Expected tests / validation:** Password/security regression tests, authn/authz matrix tests, BOLA/IDOR-style scoped-access tests, CSRF tests, session revocation/expiry tests, logging-redaction tests, and focused secure-code review.
+- **Predecessors:** T12 and explicit local-auth storage/security approval.
+
+#### T14: Implement external identity adapters
+
+- **Objective:** Add explicitly configured alternatives to the local default: Active Directory LDAP, OpenLDAP-compatible LDAP, OAuth 2.0/OIDC, and Azure SSO.
+- **Specific changes:** Implement separate adapters, strict TLS/certificate/bind configuration and filter/DN handling for LDAP, issuer/claim validation for OIDC/Azure, external-identity mapping, group/claim-to-role mapping, and fail-closed configuration.
+- **Definition of done:** External identity is opt-in; LDAP rejects anonymous/unauthenticated and insecure production binding; all adapters map only allowlisted identities/groups/claims into least-privilege roles.
+- **Expected tests / validation:** Adapter fixtures/mocks; LDAP escaping and TLS/certificate tests; OIDC issuer/audience/expiry/claim tests; group/claim mapping denial tests; secure-code review of identity flows.
+- **Predecessors:** T13 and explicit external identity dependency approval.
+
+#### T15: Implement the authenticated web UI workflows
+
+- **Objective:** Provide the approved UI over the secured API for findings, evidence, policy, configuration, and audit-relevant actions.
+- **Specific changes:** Add minimal UI routes/components, authenticated session handling, scoped findings/history views, policy administration with expiry/ownership fields, configuration views, error/empty/loading states, and safe rendering of untrusted DNS/provider data.
+- **Definition of done:** The UI uses the same authorization policy as the API, does not render raw/untrusted HTML, and cannot perform actions the server does not authorize.
+- **Expected tests / validation:** UI/component tests, route authorization tests, XSS-safe rendering tests, CSRF state-change tests, accessibility checks for critical workflows, and browser-security regression checks.
+- **Predecessors:** T12 through T14.
+
+#### T16: Implement the Azure DNS and Azure ownership adapters
+
+- **Objective:** Deliver the first non-AWS provider in the approved sequence with paired ownership context.
+- **Specific changes:** Add Azure DNS zone/record collection and Azure resource-ownership evidence using read-only credentials, canonical normalization, pagination/error coverage, and provider-specific fixtures.
+- **Definition of done:** Azure DNS findings meet the same coverage/evidence contract as Route 53 and do not assume a subscription/resource inventory is complete when access is partial.
+- **Expected tests / validation:** Azure fixtures for zone/record pagination, permissions, throttling, malformed responses, aliases, and partial scope; read-only credential documentation; analyzer parity tests.
+- **Predecessors:** T4, T9, T10, and explicit Azure SDK/dependency approval.
+
+#### T17: Implement the GoDaddy adapter
+
+- **Objective:** Add GoDaddy DNS inventory in the approved provider order.
+- **Specific changes:** Implement scoped read-only configuration, domain/record collection, canonical normalization, provider-specific error/pagination coverage, and collection-boundary reporting.
+- **Definition of done:** GoDaddy retrieval is distinguished from proof of authoritative DNS hosting, and failures/partial visibility remain explicit coverage events.
+- **Expected tests / validation:** Sanitized provider fixtures, authorization/error tests, domain/zone authority edge cases, normalization tests, and analyzer parity tests.
+- **Predecessors:** T4, T9, T10, and T16; explicit provider dependency approval.
+
+#### T18: Implement the Namecheap adapter
+
+- **Objective:** Add Namecheap DNS inventory as the final approved provider adapter.
+- **Specific changes:** Implement scoped read-only configuration, host-record collection, canonical normalization, provider-specific error handling, and explicit coverage results.
+- **Definition of done:** Namecheap results meet the shared contract and never transform unavailable or partial API data into an empty authoritative inventory.
+- **Expected tests / validation:** Sanitized provider fixtures, authentication/throttling/error tests, record-normalization tests, and analyzer parity tests.
+- **Predecessors:** T4, T9, T10, and T17; explicit provider dependency approval.
+
+#### T19: Containerize and add Kubernetes/GitLab operational hardening
+
+- **Objective:** Package the approved worker/control-plane deployment pattern and its operational safeguards.
+- **Specific changes:** Add container build, deployment/job manifest patterns, resource limits, probes, secret/config injection documentation, GitLab CI integration, SBOM/SCA/image scan controls, log-ingestion integration, and an upgrade/rollback/runbook package. Do not provision MySQL.
+- **Definition of done:** The application can run as a combined single instance or scaled worker/control-plane deployment against owner-managed MySQL/PXC with documented operational prerequisites.
+- **Expected tests / validation:** Container build, image scan, deployment-manifest validation, startup/readiness checks, migration-job validation, CI script execution, and restore/upgrade runbook exercise.
+- **Predecessors:** T11 through T15 and explicit container/CI/Kubernetes approval.
+
+#### T20: Perform milestone security review and release validation
+
+- **Objective:** Validate the completed v2 scope before release consideration.
+- **Specific changes:** Run the repository-grounded secure-code-review workflow against changed files first; update the threat model for implementation evidence; resolve or formally accept material findings; finalize supply-chain, authorization, DNS-only egress, migration, data-retention, and provider-coverage evidence.
+- **Definition of done:** Review artifacts identify evidence-based strengths/findings, all acceptance criteria are mapped to validation evidence, and any residual risk has an accountable owner and expiry.
+- **Expected tests / validation:** Full repository test suite, dependency/SBOM/image review, rendered/validated Mermaid diagrams, security regression suite, multi-instance and database upgrade tests, and release checklist sign-off.
+- **Predecessors:** T19 and completion of all in-scope provider tasks.
+
+### 6. Risks and Edge Cases
+
+| Risk or edge case | Planned handling |
+| --- | --- |
+| Legacy-v2 confusion | T1 and later documentation preserve the Bash file unchanged and clearly separate its scope from v2. |
+| Missing prerequisites | Each task lists predecessors; execution stops rather than silently creating unapproved dependencies or architecture. |
+| Provider-specific inventory semantics | T4 establishes the contract; T5/T16–T18 use provider fixtures and explicit coverage events rather than treating empty results as authoritative. |
+| Misclassification of DNS drift | T6–T9 retain bounded evidence, ownership context, historical state, policy, and confidence; no DNS-only conclusion becomes a confirmed takeover. |
+| DNS-only boundary erosion | T6, T9, and T20 include architecture/egress tests prohibiting HTTP/TLS/application probing and resource claims. |
+| Database contention or unsafe migrations | T3, T8, and T11 use Sequelize-only access, a controlled migration actor, configured pool budget, and leased/idempotent jobs. |
+| Control-plane attack surface | T12–T15 are explicitly deferred and gated; they include AJV, Helmet, strict CSP, local-by-default identity, server-side authorization, CSRF where relevant, and identity-specific security tests. |
+| Retention/privacy drift | T8 centralizes owner-configurable limits, disables raw evidence by default, and uses bounded/auditable purge jobs. |
+| Deployment assumptions | T19 starts only after the application-level tasks are complete and explicit container/Kubernetes/CI approval is reconfirmed. |
+
+### 7. Open Questions / Assumptions
+
+All material product-design questions are resolved in the approved specification. The following implementation-time gates remain deliberately unresolved until the relevant task is selected: the exact dependency choices; credential-secret delivery mechanism and provider scopes; target MySQL/PXC test environment; OIDC/Azure/LDAP tenant-specific connection details; UI framework choice; GitLab shared-template requirements; and Kubernetes deployment conventions. These are **approval gates**, not permission to make assumptions.
+
+### 8. Suggested Execution Order
+
+1. **T1–T4:** Establish the isolated JavaScript, configuration, persistence, and canonical-contract foundations before any external provider behavior.
+2. **T5–T11:** Prove Route 53, DNS-only resolution, ownership, retention, analyzers, reporting, and multi-instance worker correctness.
+3. **T12–T15:** Add the optional REST/UI control plane and its local/external identity strategies only after the authoritative worker/reporting path exists.
+4. **T16–T18:** Add Azure DNS, GoDaddy, and Namecheap in the approved sequence with the shared coverage/evidence contract.
+5. **T19–T20:** Add deployment hardening and complete security/release validation after application behavior is mature.
+
+No task in this implementation plan is authorized for code execution until the user selects the specific task and confirms the applicable approval gates.
+
+## Planning Workflow Reconciliation
+
+The imported `plan-feat` workflow has been applied by adding this task-level plan. The imported `implement-feat` workflow governs future execution: one selected task only, no silent scope expansion, validation alongside code, explicit blocker reporting, and task-status updates only after the definition of done is satisfied. The imported threat-model and secure-code-review workflows are required pre-implementation and at the security-sensitive/release milestones stated above. Their helper scripts remain external review tools and are not application dependencies or repository content.
+
+## Task Status
+
+All tasks T1–T20 are **Pending**. No application code, dependency, runtime, schema, API, UI, or deployment configuration has been introduced by this planning update.
+
+## Approval Status
+
+**Task-Level Plan Ready for Review**
+
+
+## Database Lifecycle and Logical Export Amendment
+
+The owner is solely responsible for the MySQL/PXC database lifecycle, including provisioning, topology, availability, encryption, backups, recovery, monitoring, capacity, and execution of database-level restore operations. Ghost Records will provide configuration guidance, migration compatibility, upgrade notes, and documented backup/restore validation guidance; it does not operate, manage, warrant, or assume responsibility for database backup, availability, degradation, or data loss. This boundary applies equally to single-instance and Kubernetes deployments.
+
+V2 must provide a **logical administrative data-export capability** to assist owners with their backup and recovery processes. This feature is not a replacement for database-native backup or restore tooling and must not be described as a guaranteed, complete, point-in-time, or physical MySQL backup. V2 does not include data import, automatic restoration, database dump orchestration, or database lifecycle management.
+
+| Logical export requirement | V2 requirement |
+| --- | --- |
+| Authorization | Expose export only through the enabled control plane to an explicitly authorized administrative permission. It is unavailable while the control plane is disabled. |
+| Data scope | Support bounded exports of normalized findings/history, DNS observations, policy records, retention metadata, and audit-relevant application records. Exclude secrets, provider credentials, database credentials, password hashes, session tokens, recovery secrets, raw confidential configuration, and any excluded raw evidence. |
+| Format and provenance | Produce versioned JSON and CSV formats with an export manifest declaring schema version, creation time, requested scope, record counts, excluded categories, and application version. |
+| Delivery | Generate exports by bounded server-side streaming or a leased job with an authorized download path. Do not rely on container-local disk for durability or correctness. |
+| Security controls | Enforce server-side scope authorization, centralized AJV validation, row/record limits, rate limiting, audit logging, redaction, safe content-disposition headers, and retention/deletion according to the owner-configured artifact policy. |
+| Operations guidance | Document that owners must use their MySQL/PXC-native backup and restore tooling for database recovery, validate logical exports for their own environment, and periodically test their documented recovery procedure. |
+
+### T15A: Implement secured administrative logical data export
+
+- **Objective:** Provide a controlled administrative export path that assists owner-managed backup and recovery operations without asserting database-backup responsibility.
+- **Specific changes:** Add an authorization permission and scoped control-plane export workflow; implement centrally validated filters, bounded JSON/CSV serialization, a versioned manifest, safe streaming or leased-job delivery, export audit events, rate limits, redaction/exclusion rules, artifact-retention integration, and user-facing guidance that explains the logical-export limitation.
+- **Definition of done:** Authorized administrators can export only their permitted, non-secret logical application data; every export is auditable and bounded; no export includes credentials, password hashes, tokens, session records, raw confidential configuration, or excluded raw evidence; and no behavior claims a physical or point-in-time database backup.
+- **Expected tests / validation:** Authorization-scope and BOLA/IDOR tests; secret-exclusion/redaction tests; schema/manifest tests; row-limit and rate-limit tests; CSV formula-injection-safe serialization tests; streaming/job-resume tests; artifact-retention tests; security review of export/download flows; and documentation review against owner-managed database responsibility.
+- **Predecessors:** T10, T12, T13, and T15.
+
+### Execution-order amendment
+
+T15A follows T15 and precedes T19. T20 must include logical-export authorization, secret-exclusion, retention, and recovery-guidance validation. This amendment supersedes any earlier wording that could imply Ghost Records performs database backup, recovery, or lifecycle management.
