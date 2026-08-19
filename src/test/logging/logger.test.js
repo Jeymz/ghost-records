@@ -23,6 +23,7 @@ describe('structured logger', () => {
         },
       },
       authorization: 'Bearer session-token',
+      connectionString: 'mysql://ghost:database-password@mysql.internal/ghost_records',
       source: 'untrusted-source',
       level: 'http',
       message: 'untrusted-message',
@@ -43,6 +44,7 @@ describe('structured logger', () => {
           },
         },
         authorization: REDACTED_VALUE,
+        connectionString: 'mysql://ghost:[REDACTED]@mysql.internal/ghost_records',
       },
     ]);
   });

@@ -30,6 +30,7 @@ const runtimeDefaults = Object.freeze({
   GHOST_RECORDS_DB_POOL_MAX: '5',
   GHOST_RECORDS_DB_POOL_ACQUIRE_MS: '30000',
   GHOST_RECORDS_DB_POOL_IDLE_MS: '10000',
+  GHOST_RECORDS_MIGRATION_ACTOR_ENABLED: 'false',
   GHOST_RECORDS_RETENTION_HISTORY_DAYS: '365',
   GHOST_RECORDS_RETENTION_REGISTRATION_DAYS: '90',
   GHOST_RECORDS_RETENTION_ARTIFACT_DAYS: '90',
@@ -123,6 +124,10 @@ function normalizeRuntimeEnvironment(environment) {
       password: environment.GHOST_RECORDS_MYSQL_PASSWORD,
       tlsEnabled: parseBoolean(environment.GHOST_RECORDS_MYSQL_TLS_ENABLED),
       maxReplicas: parseInteger(environment.GHOST_RECORDS_MAX_REPLICAS),
+      connectionBudget: parseInteger(environment.GHOST_RECORDS_DB_CONNECTION_BUDGET),
+      migrationActorEnabled: parseBoolean(
+        environment.GHOST_RECORDS_MIGRATION_ACTOR_ENABLED,
+      ),
       pool: {
         min: parseInteger(environment.GHOST_RECORDS_DB_POOL_MIN),
         max: parseInteger(environment.GHOST_RECORDS_DB_POOL_MAX),
@@ -158,6 +163,23 @@ export function loadConfiguration({ environment = process.env } = {}) {
       'Normalized runtime configuration is invalid.',
       formatSchemaErrors(validateNormalizedRuntimeConfig.errors),
     );
+  }
+
+  const totalConfiguredConnections =
+    normalizedConfiguration.database.maxReplicas *
+    normalizedConfiguration.database.pool.max;
+
+  if (totalConfiguredConnections > normalizedConfiguration.database.connectionBudget) {
+    failConfiguration('Configured replica and pool limits exceed the database connection budget.', [
+      {
+        keyword: 'connectionBudget',
+        message: 'maxReplicas multiplied by pool.max must not exceed connectionBudget.',
+        params: {
+          totalConfiguredConnections,
+          connectionBudget: normalizedConfiguration.database.connectionBudget,
+        },
+      },
+    ]);
   }
 
   return deepFreeze(normalizedConfiguration);

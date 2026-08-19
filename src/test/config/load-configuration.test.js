@@ -19,6 +19,8 @@ function buildEnvironment(overrides = {}) {
     GHOST_RECORDS_DB_POOL_MAX: '5',
     GHOST_RECORDS_DB_POOL_ACQUIRE_MS: '30000',
     GHOST_RECORDS_DB_POOL_IDLE_MS: '10000',
+    GHOST_RECORDS_DB_CONNECTION_BUDGET: '10',
+    GHOST_RECORDS_MIGRATION_ACTOR_ENABLED: 'false',
     GHOST_RECORDS_RETENTION_HISTORY_DAYS: '365',
     GHOST_RECORDS_RETENTION_REGISTRATION_DAYS: '90',
     GHOST_RECORDS_RETENTION_ARTIFACT_DAYS: '90',
@@ -47,6 +49,8 @@ describe('loadConfiguration', () => {
         port: 3306,
         tlsEnabled: true,
         maxReplicas: 2,
+        connectionBudget: 10,
+        migrationActorEnabled: false,
         pool: { min: 0, max: 5, acquireMs: 30000, idleMs: 10000 },
       },
       retention: {
@@ -98,6 +102,16 @@ describe('loadConfiguration', () => {
         environment: buildEnvironment({
           GHOST_RECORDS_DB_POOL_MIN: '6',
           GHOST_RECORDS_DB_POOL_MAX: '5',
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_MAX_REPLICAS: '3',
+          GHOST_RECORDS_DB_POOL_MAX: '5',
+          GHOST_RECORDS_DB_CONNECTION_BUDGET: '14',
         }),
       }),
     ).toThrow(ConfigurationError);

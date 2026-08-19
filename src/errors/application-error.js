@@ -30,6 +30,18 @@ export class ConfigurationError extends ApplicationError {
   }
 }
 
+export class PersistenceError extends ApplicationError {
+  constructor({ message, details = undefined, cause = undefined }) {
+    super({
+      message,
+      code: 'PERSISTENCE_FAILURE',
+      statusCode: 503,
+      details,
+      cause,
+    });
+  }
+}
+
 export class ValidationError extends ApplicationError {
   constructor({ message, details = undefined, cause = undefined }) {
     super({

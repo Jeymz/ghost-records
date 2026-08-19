@@ -7,7 +7,18 @@ export function isSensitiveKey(key) {
   return SENSITIVE_KEY_PATTERN.test(String(key));
 }
 
+function redactString(value) {
+  return value.replace(
+    /((?:mysql|mariadb)(?:\+[a-z0-9_-]+)?:\/\/[^:/\s]+:)[^@/\s]+@/giu,
+    '$1[REDACTED]@',
+  );
+}
+
 export function redact(value, seen = new WeakSet()) {
+  if (typeof value === 'string') {
+    return redactString(value);
+  }
+
   if (value === null || typeof value !== 'object') {
     return value;
   }

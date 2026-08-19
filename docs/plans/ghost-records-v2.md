@@ -335,11 +335,11 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 
 ## Approval Status
 
-**Ready for Approval**
+**T3 Complete — T4 Awaiting Selection and Approval**
 
 ## Implementation Notes
 
-Reserved for implementation-phase updates. No implementation has been authorized or performed.
+Implementation is underway on `feat-ghost_records_v2_implementation`. T1 and T2 are committed as individual scoped tasks; T3 has completed validation and its scoped commit is pending. Later tasks remain gated by their documented approvals and prerequisites.
 
 ## Change Summary
 
@@ -432,7 +432,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** Unit tests for required/invalid/unknown configuration, schema rejection, redaction, and error serialization; secure-code review focused on secrets, logging, and configuration.
 - **Predecessors:** T1.
 
-#### T3: Establish Sequelize-only MySQL infrastructure and migration lifecycle
+#### T3: [x] Establish Sequelize-only MySQL infrastructure and migration lifecycle
 
 - **Objective:** Create the owner-provisioned MySQL 8.0+/compatible-PXC persistence boundary.
 - **Specific changes:** Add Sequelize initialization, a repository/model boundary, connection/TLS/pool configuration, controlled single-writer migration runner, migration tracking, health/readiness checks, and connection-budget validation based on configured replica limits. Do not provision MySQL or introduce raw SQL/direct-driver feature access.
@@ -612,7 +612,8 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 
 - [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task is committed as `703690a`. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
 - [x] **T2 — Implement centralized configuration, errors, and structured redaction.** Strict AJV schemas, a centralized allowlisted configuration loader, normalized immutable configuration, typed errors, structured redaction, logical-source logging, and focused unit/security-review coverage are complete.
-- [ ] **T3–T20 and T15A — Pending.**
+- [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete; the task commit is pending.
+- [ ] **T4–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -633,9 +634,21 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Test and review evidence | Added ten T2-focused tests; the complete suite has 12 passing tests. `npm run audit`, `npm run lint`, `npm run test:run`, `npm run coverage`, and `npm run build` pass. The focused review is recorded in `Secure Code Review - 2026-08-19.md`, including three remediated code-anchored findings. |
 | Scope boundary | No database connection, raw SQL, provider adapter, DNS query, HTTP listener, API route, authentication, container, Kubernetes, or CI behavior was introduced. |
 
+### T3 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Persistence boundary | Added a Sequelize-only MySQL client factory that consumes centralized configuration, applies the approved TLS/pool settings, disables ORM SQL logging, exposes readiness/close helpers, and does not provision MySQL or create a bundled database. |
+| Migration lifecycle | Added immutable migration-manifest validation; Sequelize model/repository boundaries for migration ledger and lease metadata; controlled database-backed single-writer leasing; transactional `up` application; deterministic ledger ordering; and transactional last-migration rollback through mandatory `down` functions. |
+| Configuration safety | Added required owner-declared connection-budget validation against `maxReplicas × pool.max` and a default-disabled migration-actor control. |
+| MySQL/PXC validation path | Added the opt-in `npm run test:integration` owner-provided MySQL/PXC integration path and `docs/testing/mysql-pxc-integration.md`. It is skipped locally because no owner-approved test database was supplied. |
+| UUID advisory | Retained stable Sequelize under the owner-approved temporary acceptance for GHSA-w5hq-g745-h8pq. `docs/security/uuid-advisory-mitigation.md` records scope, reachability evidence, residual risk, review cadence, and removal criteria. The active guard rejects affected UUID algorithms and caller buffers/offsets; architecture tests prohibit direct UUID imports and direct MySQL-driver/raw-query use. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed; `npm audit` reports two accepted moderate UUID advisory entries and no high or critical vulnerability. |
+| Scope boundary | No domain schema migration, provider adapter, DNS query, HTTP listener, API route, authentication, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T2 Complete — T3 Awaiting Selection and Approval**
+**T3 Complete — T4 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

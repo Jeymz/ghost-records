@@ -14,13 +14,16 @@
     "lint": "eslint .",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:integration": "vitest run src/test/persistence/mysql.integration.test.js",
     "coverage": "vitest run --coverage",
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
     "ajv": "^8.20.0",
+    "mysql2": "^3.23.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sequelize": "^6.37.8"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.0",
