@@ -37,6 +37,11 @@ const runtimeDefaults = Object.freeze({
   GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: '30',
   GHOST_RECORDS_RAW_EVIDENCE_ENABLED: 'false',
   GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: '[]',
+  GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH: '8',
+  GHOST_RECORDS_DNS_MAX_QUERIES: '32',
+  GHOST_RECORDS_DNS_MAX_CONCURRENCY: '4',
+  GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS: '3000',
+  GHOST_RECORDS_DNS_MAX_ANSWERS: '100',
 });
 
 function formatSchemaErrors(errors) {
@@ -208,6 +213,13 @@ function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
       rawEvidenceDays: parseInteger(environment.GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS),
     },
     rawEvidenceEnabled: parseBoolean(environment.GHOST_RECORDS_RAW_EVIDENCE_ENABLED),
+    dns: {
+      maxChainDepth: parseInteger(environment.GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH),
+      maxQueries: parseInteger(environment.GHOST_RECORDS_DNS_MAX_QUERIES),
+      maxConcurrency: parseInteger(environment.GHOST_RECORDS_DNS_MAX_CONCURRENCY),
+      queryTimeoutMs: parseInteger(environment.GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS),
+      maxAnswers: parseInteger(environment.GHOST_RECORDS_DNS_MAX_ANSWERS),
+    },
     providerCredentialReferences,
     providerCredentials: resolveProviderCredentials(providerCredentialReferences, sourceEnvironment),
   };

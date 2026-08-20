@@ -40,6 +40,21 @@ const providerSchema = {
   enum: PROVIDERS,
 };
 
+const addressClassificationSchema = {
+  type: 'string',
+  enum: [
+    'public',
+    'private',
+    'reserved',
+    'loopback',
+    'link-local',
+    'multicast',
+    'unspecified',
+    'documentation',
+    'unknown',
+  ],
+};
+
 const coverageReasonSchema = {
   type: 'string',
   enum: [
@@ -165,8 +180,11 @@ export const dnsObservationSchema = {
     'queryName',
     'queryType',
     'chain',
+    'terminalName',
     'answers',
+    'answerRecords',
     'rcode',
+    'coverage',
     'resolverEvidence',
     'observedAt',
   ],
@@ -179,27 +197,104 @@ export const dnsObservationSchema = {
       maxItems: 32,
       items: dnsNameSchema,
     },
+    terminalName: dnsNameSchema,
     answers: {
       type: 'array',
       maxItems: 100,
       uniqueItems: true,
-      items: { type: 'string', minLength: 1, maxLength: 1024 },
+      items: ipAddressSchema,
+    },
+    answerRecords: {
+      type: 'array',
+      maxItems: 100,
+      uniqueItems: true,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['address', 'family', 'ttl', 'classification'],
+        properties: {
+          address: ipAddressSchema,
+          family: { type: 'integer', enum: [4, 6] },
+          ttl: { type: 'integer', minimum: 0, maximum: 2_147_483_647 },
+          classification: addressClassificationSchema,
+        },
+      },
     },
     rcode: {
       type: 'string',
-      enum: ['NOERROR', 'NXDOMAIN', 'SERVFAIL', 'REFUSED', 'TIMEOUT', 'UNKNOWN'],
+      enum: ['NOERROR', 'NXDOMAIN', 'NODATA', 'SERVFAIL', 'REFUSED', 'TIMEOUT', 'UNKNOWN'],
+    },
+    coverage: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['status', 'reason'],
+      properties: {
+        status: { type: 'string', enum: ['complete', 'partial', 'failed'] },
+        reason: {
+          type: 'string',
+          enum: [
+            'complete',
+            'resolver-failure',
+            'timeout',
+            'query-limit',
+            'depth-limit',
+            'chain-cycle',
+            'malformed-response',
+            'unknown',
+          ],
+        },
+      },
     },
     resolverEvidence: {
       type: 'object',
       additionalProperties: false,
-      required: ['resolver', 'transport', 'queriedAt'],
+      required: [
+        'resolver',
+        'transport',
+        'queriedAt',
+        'queryCount',
+        'maxQueries',
+        'maxDepth',
+        'timeoutMs',
+      ],
       properties: {
         resolver: { type: 'string', minLength: 1, maxLength: 253 },
-        transport: { type: 'string', enum: ['udp', 'tcp', 'doh', 'dot'] },
+        transport: { type: 'string', enum: ['system'] },
         queriedAt: timestampSchema,
+        queryCount: { type: 'integer', minimum: 0, maximum: 128 },
+        maxQueries: { type: 'integer', minimum: 1, maximum: 128 },
+        maxDepth: { type: 'integer', minimum: 1, maximum: 32 },
+        timeoutMs: { type: 'integer', minimum: 1, maximum: 30000 },
       },
     },
     observedAt: timestampSchema,
+  },
+};
+
+export const dnsResolutionRequestSchema = {
+  $id: `${schemaBase}/dns-resolution-request.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: ['recordKey', 'target', 'queryType'],
+  properties: {
+    recordKey: identifierSchema,
+    target: dnsNameSchema,
+    queryType: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'NS'] },
+  },
+};
+
+export const dnsResolutionBatchRequestSchema = {
+  $id: `${schemaBase}/dns-resolution-batch-request.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: ['requests'],
+  properties: {
+    requests: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 1000,
+      items: { $ref: dnsResolutionRequestSchema.$id },
+    },
   },
 };
 
@@ -543,6 +638,8 @@ export const domainSchemas = Object.freeze([
   dnsZoneSchema,
   dnsRecordSchema,
   dnsObservationSchema,
+  dnsResolutionRequestSchema,
+  dnsResolutionBatchRequestSchema,
   ownershipEvidenceSchema,
   coverageEventSchema,
   scanJobSchema,

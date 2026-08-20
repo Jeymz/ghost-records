@@ -37,14 +37,34 @@ export const dnsObservation = {
   queryName: 'app.example.com.',
   queryType: 'CNAME',
   chain: ['app.example.com.', 'service.example.net.'],
+  terminalName: 'service.example.net.',
   answers: ['203.0.113.10'],
+  answerRecords: [
+    {
+      address: '203.0.113.10',
+      family: 4,
+      ttl: 300,
+      classification: 'documentation',
+    },
+  ],
   rcode: 'NOERROR',
+  coverage: { status: 'complete', reason: 'complete' },
   resolverEvidence: {
-    resolver: 'resolver.internal.example',
-    transport: 'udp',
+    resolver: 'system-configured',
+    transport: 'system',
     queriedAt: observedAt,
+    queryCount: 3,
+    maxQueries: 32,
+    maxDepth: 8,
+    timeoutMs: 3000,
   },
   observedAt,
+};
+
+export const dnsResolutionRequest = {
+  recordKey: dnsRecord.recordKey,
+  target: 'service.example.net.',
+  queryType: 'CNAME',
 };
 
 export const ownershipEvidence = {

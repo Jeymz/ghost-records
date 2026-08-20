@@ -63,6 +63,20 @@ describe('persistence architecture boundary', () => {
     expect(signer).toContain("export const ROUTE53_ENDPOINT = 'https://route53.amazonaws.com'");
   });
 
+  it('keeps DNS evidence collection DNS-only without HTTP, TLS, socket, or process execution paths', async () => {
+    const dnsRoot = path.join(sourceRoot, 'dns');
+    const dnsFiles = await collectJavaScriptFiles(dnsRoot);
+
+    for (const filePath of dnsFiles) {
+      const content = await readFile(filePath, 'utf8');
+      expect(content).not.toMatch(/from ['"]node:(?:http|https|tls|child_process|dgram)['"]/u);
+      expect(content).not.toMatch(/\b(?:fetch|WebSocket|net\.connect|exec|spawn)\s*\(/u);
+    }
+
+    const resolver = await readFile(path.join(dnsRoot, 'resolver.js'), 'utf8');
+    expect(resolver).toContain("from 'node:dns/promises'");
+  });
+
   it('keeps process.env access inside the central configuration module', async () => {
     const sourceFiles = await collectJavaScriptFiles(sourceRoot);
 

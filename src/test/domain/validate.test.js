@@ -5,6 +5,7 @@ import { validateDomainObject } from '../../domain/validate.js';
 import {
   completeCoverageEvent,
   dnsObservation,
+  dnsResolutionRequest,
   dnsRecord,
   dnsZone,
   finding,
@@ -20,6 +21,7 @@ describe('canonical domain validation', () => {
     ['dnsZone', dnsZone],
     ['dnsRecord', dnsRecord],
     ['dnsObservation', dnsObservation],
+    ['dnsResolutionRequest', dnsResolutionRequest],
     ['ownershipEvidence', ownershipEvidence],
     ['coverageEvent', completeCoverageEvent],
     ['scanJob', scanJob],
@@ -54,6 +56,15 @@ describe('canonical domain validation', () => {
       validateDomainObject('dnsRecord', {
         ...dnsRecord,
         ttl: '300',
+      }),
+    ).toThrow('Canonical domain object validation failed.');
+  });
+
+  it('rejects malformed or unexpected DNS resolution batch input before resolver work', () => {
+    expect(() =>
+      validateDomainObject('dnsResolutionBatchRequest', {
+        requests: [dnsResolutionRequest],
+        unexpected: true,
       }),
     ).toThrow('Canonical domain object validation failed.');
   });

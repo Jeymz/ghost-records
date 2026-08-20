@@ -4,6 +4,8 @@ import { ValidationError } from '../errors/application-error.js';
 import {
   domainSchemas,
   dnsObservationSchema,
+  dnsResolutionRequestSchema,
+  dnsResolutionBatchRequestSchema,
   dnsRecordSchema,
   dnsZoneSchema,
   findingSchema,
@@ -29,6 +31,8 @@ export const DOMAIN_SCHEMA_IDS = Object.freeze({
   dnsZone: dnsZoneSchema.$id,
   dnsRecord: dnsRecordSchema.$id,
   dnsObservation: dnsObservationSchema.$id,
+  dnsResolutionRequest: dnsResolutionRequestSchema.$id,
+  dnsResolutionBatchRequest: dnsResolutionBatchRequestSchema.$id,
   ownershipEvidence: ownershipEvidenceSchema.$id,
   coverageEvent: coverageEventSchema.$id,
   scanJob: scanJobSchema.$id,

@@ -62,6 +62,13 @@ describe('loadConfiguration', () => {
         rawEvidenceDays: 30,
       },
       rawEvidenceEnabled: false,
+      dns: {
+        maxChainDepth: 8,
+        maxQueries: 32,
+        maxConcurrency: 4,
+        queryTimeoutMs: 3000,
+        maxAnswers: 100,
+      },
     });
     expect(Object.isFrozen(configuration)).toBe(true);
     expect(Object.isFrozen(configuration.database.pool)).toBe(true);
@@ -115,6 +122,20 @@ describe('loadConfiguration', () => {
           GHOST_RECORDS_DB_POOL_MAX: '5',
           GHOST_RECORDS_DB_CONNECTION_BUDGET: '14',
         }),
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('enforces bounded DNS resolver limits through the central schema', () => {
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({ GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH: '33' }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({ GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS: '30001' }),
       }),
     ).toThrow(ConfigurationError);
   });

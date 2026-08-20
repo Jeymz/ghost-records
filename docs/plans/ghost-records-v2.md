@@ -327,7 +327,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [x] Implement central configuration, AJV schemas, structured logging/redaction, error taxonomy, and tests.
 - [x] Define canonical schemas and adapter contracts.
 - [x] Implement and test the Route 53 adapter with coverage reporting.
-- [ ] Implement bounded DNS evidence collection and tests.
+- [x] Implement bounded DNS evidence collection and tests.
 - [ ] Implement approved storage, policy, ownership evidence, baseline, and drift functionality.
 - [ ] Implement analyzers, report formats, and passive-only fingerprint policy.
 - [ ] Add Azure DNS, GoDaddy, and Namecheap adapters in approved order.
@@ -336,7 +336,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 
 ## Implementation Notes
 
-Implementation is underway on `feat-ghost_records_v2_implementation`. T1 through T4 are committed as individual scoped tasks. T5 uses the owner-approved direct Route 53 Query API strategy, has completed validation and review, and awaits its scoped task commit; T6 and later tasks remain gated by their documented approvals and prerequisites.
+Implementation is underway on `feat-ghost_records_v2_implementation`. T1 through T5 are committed as individual scoped tasks. T6 provides the validated native DNS-only resolver, has completed review, and awaits its scoped task commit; T7 and later tasks remain gated by their documented approvals and prerequisites.
 
 ## Change Summary
 
@@ -463,7 +463,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** Recorded/sanitized XML fixtures for normal pages, repeated/absent tokens, empty zones, private zones, authorization denial, throttling, malformed data, XML parser hardening, partial scans, and every pagination continuation field. Add deterministic SigV4 canonical-request/signature tests using fixed test credentials and time; configuration/redaction tests for static and session credentials; response-size/timeout/retry bounds; and an architecture test that rejects AWS SDK imports, mutation operation names, and non-fixed Route 53 endpoints.
 - **Predecessors:** T4 and approved direct-API/parser dependency choice.
 
-#### T6: Implement bounded DNS-only resolution evidence collection
+#### T6: [x] Implement bounded DNS-only resolution evidence collection
 
 - **Objective:** Collect DNS chain and terminal-answer evidence without HTTP/TLS/application probing.
 - **Specific changes:** Add normalized hostname handling, bounded A/AAAA/CNAME resolution, resolver outcome taxonomy, recursion/query/concurrency/response/time limits, chain cycle handling, TTL capture, and private/reserved-address classification. Persist only through approved repositories when required.
@@ -621,8 +621,9 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 - [x] **T2 — Implement centralized configuration, errors, and structured redaction.** Strict AJV schemas, a centralized allowlisted configuration loader, normalized immutable configuration, typed errors, structured redaction, logical-source logging, and focused unit/security-review coverage are complete.
 - [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete as `cbe294b`.
 - [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete as `678521d`.
-- [x] **T5 — Implement Route 53 collection with explicit coverage reporting.** The direct read-only Query API adapter, native SigV4 signing, central credential resolution, bounded XML parsing, manual zone enablement, canonical normalization, typed coverage outcomes, fixtures, direct-client architecture guard, deployment guide, and focused secure-code review are complete; the task commit is pending.
-- [ ] **T6–T20 and T15A — Pending.**
+- [x] **T5 — Implement Route 53 collection with explicit coverage reporting.** The direct read-only Query API adapter, native SigV4 signing, central credential resolution, bounded XML parsing, manual zone enablement, canonical normalization, typed coverage outcomes, fixtures, direct-client architecture guard, deployment guide, and focused secure-code review are complete as `6e39bb9`.
+- [x] **T6 — Implement bounded DNS-only resolution evidence collection.** The native `node:dns/promises` resolver, strict normalized hostname/batch input boundary, centrally configured depth/query/concurrency/timeout/answer limits, CNAME chain/cycle handling, A/AAAA TTL/classification evidence, explicit resolver coverage taxonomy, DNS-only architecture guard, operating guide, and focused secure-code review are complete; the task commit is pending.
+- [ ] **T7–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -677,9 +678,20 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 71 passing tests; the opt-in owner-provided MySQL integration test remains skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
 | Scope boundary | No Route 53 mutation, AWS SDK, AWS CLI, direct DNS query, ownership inventory, persistence schema, HTTP route, authentication change, container, Kubernetes, or CI behavior was introduced. |
 
+### T6 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Native DNS-only boundary | Added a resolver using only Node.js `node:dns/promises`; no dependency was added. Hostname normalization rejects URL syntax, ports, wildcards, whitespace, and IP literals before canonical AJV validation. The T6 architecture regression rejects HTTP, HTTPS, TLS, datagram, child-process, `fetch`, socket-connect, and service-probing paths within `src/dns/`. |
+| Bounded collection and evidence | Added CNAME/A/AAAA collection with centralized chain-depth, total-query, concurrency, per-query timeout/cancellation, and terminal-answer limits. Observations capture normalized target/chain/terminal name, terminal answers, per-answer TTL/family/special-address classification, explicit rcode/coverage outcome, query count, configured limits, and observed timestamp. |
+| Outcome fidelity | Differentiates `NOERROR`, `NODATA`, `NXDOMAIN`, `SERVFAIL`, `REFUSED`, `TIMEOUT`, cycle, depth, query-limit, malformed-response, and partial address-family outcomes. Duplicate answers are normalized with the shortest returned TTL; private/split-horizon-style answers remain contextual evidence rather than authority/ownership conclusions. |
+| Documentation and review | Added `docs/dns/dns-only-resolution.md` and `Secure Code Review - 2026-08-20 - T6.md`. The focused review records two resolved implementation findings and the explicit owner-managed resolver-trust/DNSSEC/provenance limitation. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 87 passing tests; the opt-in owner-provided MySQL integration test remains skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
+| Scope boundary | No HTTP/TLS/application probing, reverse DNS, DNS server configuration, DNSSEC claim, provider integration, ownership inventory, persistence write, API/UI/authentication, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T5 Complete — T6 Awaiting Selection and Approval**
+**T6 Complete — T7 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

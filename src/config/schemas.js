@@ -21,6 +21,11 @@ export const RUNTIME_ENVIRONMENT_KEYS = Object.freeze([
   'GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS',
   'GHOST_RECORDS_RAW_EVIDENCE_ENABLED',
   'GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON',
+  'GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH',
+  'GHOST_RECORDS_DNS_MAX_QUERIES',
+  'GHOST_RECORDS_DNS_MAX_CONCURRENCY',
+  'GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS',
+  'GHOST_RECORDS_DNS_MAX_ANSWERS',
 ]);
 
 const booleanStringSchema = {
@@ -111,6 +116,11 @@ export const runtimeEnvironmentSchema = {
       type: 'string',
       minLength: 2,
     },
+    GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH: positiveIntegerStringSchema,
+    GHOST_RECORDS_DNS_MAX_QUERIES: positiveIntegerStringSchema,
+    GHOST_RECORDS_DNS_MAX_CONCURRENCY: positiveIntegerStringSchema,
+    GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS: positiveIntegerStringSchema,
+    GHOST_RECORDS_DNS_MAX_ANSWERS: positiveIntegerStringSchema,
   },
 };
 
@@ -154,6 +164,7 @@ export const normalizedRuntimeConfigSchema = {
     'rawEvidenceEnabled',
     'providerCredentialReferences',
     'providerCredentials',
+    'dns',
   ],
   properties: {
     environment: {
@@ -227,6 +238,18 @@ export const normalizedRuntimeConfigSchema = {
     rawEvidenceEnabled: { type: 'boolean' },
     providerCredentialReferences: {
       $ref: 'https://ghost-records.dev/schemas/provider-credential-references.json',
+    },
+    dns: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['maxChainDepth', 'maxQueries', 'maxConcurrency', 'queryTimeoutMs', 'maxAnswers'],
+      properties: {
+        maxChainDepth: { type: 'integer', minimum: 1, maximum: 32 },
+        maxQueries: { type: 'integer', minimum: 1, maximum: 128 },
+        maxConcurrency: { type: 'integer', minimum: 1, maximum: 32 },
+        queryTimeoutMs: { type: 'integer', minimum: 1, maximum: 30000 },
+        maxAnswers: { type: 'integer', minimum: 1, maximum: 100 },
+      },
     },
     providerCredentials: {
       type: 'array',
