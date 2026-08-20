@@ -32,6 +32,8 @@ function buildEnvironment(overrides = {}) {
         secretEnvironmentKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
       },
     ]),
+    AWS_ACCESS_KEY_ID: 'AKIATESTACCESSKEY',
+    AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
     ...overrides,
   };
 }
@@ -112,6 +114,73 @@ describe('loadConfiguration', () => {
           GHOST_RECORDS_MAX_REPLICAS: '3',
           GHOST_RECORDS_DB_POOL_MAX: '5',
           GHOST_RECORDS_DB_CONNECTION_BUDGET: '14',
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('resolves declared Route 53 static and session credentials centrally', () => {
+    const configuration = loadConfiguration({
+      environment: buildEnvironment({
+        AWS_SESSION_TOKEN: 'test-session-token',
+        GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: JSON.stringify([
+          {
+            provider: 'route53',
+            secretEnvironmentKeys: [
+              'AWS_ACCESS_KEY_ID',
+              'AWS_SECRET_ACCESS_KEY',
+              'AWS_SESSION_TOKEN',
+            ],
+          },
+        ]),
+      }),
+    });
+
+    expect(configuration.providerCredentials).toEqual([
+      {
+        provider: 'route53',
+        values: {
+          AWS_ACCESS_KEY_ID: 'AKIATESTACCESSKEY',
+          AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
+          AWS_SESSION_TOKEN: 'test-session-token',
+        },
+      },
+    ]);
+  });
+
+  it('fails closed for missing, unsupported, or duplicate Route 53 credential references', () => {
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({ AWS_SECRET_ACCESS_KEY: undefined }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: JSON.stringify([
+            {
+              provider: 'route53',
+              secretEnvironmentKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'PATH'],
+            },
+          ]),
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: JSON.stringify([
+            {
+              provider: 'route53',
+              secretEnvironmentKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+            },
+            {
+              provider: 'route53',
+              secretEnvironmentKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+            },
+          ]),
         }),
       }),
     ).toThrow(ConfigurationError);

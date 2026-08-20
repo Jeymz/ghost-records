@@ -48,6 +48,21 @@ describe('persistence architecture boundary', () => {
     }
   });
 
+  it('keeps the Route 53 adapter direct, read-only, and fixed-endpoint', async () => {
+    const route53Root = path.join(sourceRoot, 'adapters', 'route53');
+    const route53Files = await collectJavaScriptFiles(route53Root);
+    const contents = await Promise.all(route53Files.map((filePath) => readFile(filePath, 'utf8')));
+
+    for (const content of contents) {
+      expect(content).not.toMatch(/from ['"]@aws-sdk\//u);
+      expect(content).not.toMatch(/require\(['"]@aws-sdk\//u);
+      expect(content).not.toMatch(/ChangeResourceRecordSets|CreateHostedZone|DeleteHostedZone|UpdateHostedZoneComment/u);
+    }
+
+    const signer = await readFile(path.join(route53Root, 'sigv4.js'), 'utf8');
+    expect(signer).toContain("export const ROUTE53_ENDPOINT = 'https://route53.amazonaws.com'");
+  });
+
   it('keeps process.env access inside the central configuration module', async () => {
     const sourceFiles = await collectJavaScriptFiles(sourceRoot);
 

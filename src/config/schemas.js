@@ -153,6 +153,7 @@ export const normalizedRuntimeConfigSchema = {
     'retention',
     'rawEvidenceEnabled',
     'providerCredentialReferences',
+    'providerCredentials',
   ],
   properties: {
     environment: {
@@ -226,6 +227,33 @@ export const normalizedRuntimeConfigSchema = {
     rawEvidenceEnabled: { type: 'boolean' },
     providerCredentialReferences: {
       $ref: 'https://ghost-records.dev/schemas/provider-credential-references.json',
+    },
+    providerCredentials: {
+      type: 'array',
+      maxItems: 4,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['provider', 'values'],
+        properties: {
+          provider: {
+            type: 'string',
+            enum: ['route53', 'azure-dns', 'godaddy', 'namecheap'],
+          },
+          values: {
+            type: 'object',
+            minProperties: 1,
+            additionalProperties: false,
+            patternProperties: {
+              '^[A-Z][A-Z0-9_]*$': {
+                type: 'string',
+                minLength: 1,
+                maxLength: 4096,
+              },
+            },
+          },
+        },
+      },
     },
   },
 };

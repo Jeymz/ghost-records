@@ -316,6 +316,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [x] Confirm MySQL/control-plane findings history as authoritative, with JSON artifacts and Markdown/CSV reports; centralized logs are non-authoritative and SARIF is deferred.
 - [x] Confirm the V2 operating ownership model: Application Security governs policy, triage, risk acceptance, and escalation; DNS/service owners remediate.
 - [x] Confirm provider-adapter delivery order: Route 53, Azure DNS, GoDaddy, then Namecheap.
+- [x] Confirm T5’s Route 53 integration uses the direct read-only Query API with native Node.js SigV4 signing, a fixed HTTPS Route 53 endpoint, and a narrow XML parser rather than an AWS service SDK.
 - [x] Confirm DNS-only inspection: no HTTP/TLS/service fingerprinting, endpoint probing, or resource claiming in V2.
 - [x] Confirm owner-configurable retention limits with V2 defaults and scoped access boundaries for normalized, raw, identity, audit, and report data.
 - [x] Confirm LDAP support for both Microsoft Active Directory and OpenLDAP-compatible directory services.
@@ -324,8 +325,8 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [ ] Obtain explicit implementation approval for the package layout, dependencies, MySQL/Sequelize schema, provider integrations, optional control-plane/API/UI, CI/container changes, and all public contracts.
 - [x] Initialize the isolated JavaScript ES-module package and repository scripts.
 - [x] Implement central configuration, AJV schemas, structured logging/redaction, error taxonomy, and tests.
-- [ ] Define canonical schemas and adapter contracts.
-- [ ] Implement and test the Route 53 adapter with coverage reporting.
+- [x] Define canonical schemas and adapter contracts.
+- [x] Implement and test the Route 53 adapter with coverage reporting.
 - [ ] Implement bounded DNS evidence collection and tests.
 - [ ] Implement approved storage, policy, ownership evidence, baseline, and drift functionality.
 - [ ] Implement analyzers, report formats, and passive-only fingerprint policy.
@@ -333,13 +334,9 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 - [ ] Add approved container/Kubernetes/GitLab CI configuration and operational runbook.
 - [ ] Complete security architecture review, supply-chain review, and release validation.
 
-## Approval Status
-
-**T4 Complete — T5 Awaiting Selection and Approval**
-
 ## Implementation Notes
 
-Implementation is underway on `feat-ghost_records_v2_implementation`. T1, T2, and T3 are committed as individual scoped tasks; T4 has completed validation and its scoped commit is pending. Later tasks remain gated by their documented approvals and prerequisites.
+Implementation is underway on `feat-ghost_records_v2_implementation`. T1 through T4 are committed as individual scoped tasks. T5 uses the owner-approved direct Route 53 Query API strategy, has completed validation and review, and awaits its scoped task commit; T6 and later tasks remain gated by their documented approvals and prerequisites.
 
 ## Change Summary
 
@@ -378,6 +375,16 @@ Planning validation completed: the specification reflects the supplied engineeri
 [11] [Percona, *Percona XtraDB Cluster 8.4 Documentation*](https://docs.percona.com/percona-xtradb-cluster/8.4/index.html)
 
 [12] [Percona, *Percona XtraDB Cluster 8.0 Documentation*](https://docs.percona.com/percona-xtradb-cluster/8.0/index.html)
+
+[13] [AWS, *ListHostedZones API Reference*](https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListHostedZones.html)
+
+[14] [AWS, *ListResourceRecordSets API Reference*](https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListResourceRecordSets.html)
+
+[15] [AWS, *Route 53 Endpoints and Quotas*](https://docs.aws.amazon.com/general/latest/gr/r53.html)
+
+[16] [AWS, *Create a Signed AWS API Request*](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html)
+
+[17] [AWS, *Actions, Resources, and Condition Keys for Amazon Route 53*](https://docs.aws.amazon.com/service-authorization/latest/reference/list_route53.html)
 
 
 ## Implementation Plan
@@ -448,13 +455,13 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** JSON-schema/AJV fixture tests for valid, malformed, unknown-field, partial-coverage, authorization-failure, and pagination-failure scenarios.
 - **Predecessors:** T2 and T3 where persisted types are required.
 
-#### T5: Implement Route 53 collection with explicit coverage reporting
+#### T5: [x] Implement Route 53 collection with explicit coverage reporting
 
-- **Objective:** Prove the provider-adapter contract through a read-only AWS Route 53 implementation.
-- **Specific changes:** Add Route 53 credential/config handling, hosted-zone and record pagination, public/private visibility handling, A/AAAA/CNAME/MX/NS/alias normalization, account/zone/record evidence, and typed coverage events. Use read-only operations only.
-- **Definition of done:** Route 53 produces normalized records or explicit coverage gaps for inaccessible scopes, authentication failures, throttling, malformed responses, and pagination faults.
-- **Expected tests / validation:** Recorded/sanitized API fixtures for normal pages, repeated/absent tokens, empty zones, private zones, authorization denial, throttling, malformed data, and partial scans. Verify there is no provider mutation request path.
-- **Predecessors:** T4 and approved AWS SDK/dependency choice.
+- **Objective:** Prove the provider-adapter contract through a read-only AWS Route 53 implementation without an AWS service SDK.
+- **Specific changes:** Add central Route 53 credential/config handling for environment-provided `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN`; a fixed HTTPS Route 53 endpoint; native `node:crypto` Signature Version 4 signing; and a narrowly scoped XML parser. Implement only `ListHostedZones` and `ListResourceRecordSets`, including complete hosted-zone pagination and the complete record continuation tuple (`NextRecordName`, `NextRecordType`, and `NextRecordIdentifier`). Normalize public/private zones and A/AAAA/CNAME/MX/NS/alias records, account/zone/record evidence, and typed coverage events. The direct client must bound response size, timeout, retry, and page count; reject unsupported endpoints, schemes, methods, and response content types; redact credentials; and contain no mutation request path, ambient-credential discovery, or STS role-assumption behavior. Standard-partition Route 53 requests use `https://route53.amazonaws.com` and the `us-east-1` / `route53` SigV4 scope. [13] [14] [15] [16]
+- **Definition of done:** Route 53 produces normalized records or explicit coverage gaps for inaccessible scopes, authentication failures, throttling, malformed responses, and pagination faults. The provider uses only the two approved read-only actions, signs supported environment credentials correctly including a session token when present, and cannot send a request to a caller-selected endpoint or invoke a mutation method. [17]
+- **Expected tests / validation:** Recorded/sanitized XML fixtures for normal pages, repeated/absent tokens, empty zones, private zones, authorization denial, throttling, malformed data, XML parser hardening, partial scans, and every pagination continuation field. Add deterministic SigV4 canonical-request/signature tests using fixed test credentials and time; configuration/redaction tests for static and session credentials; response-size/timeout/retry bounds; and an architecture test that rejects AWS SDK imports, mutation operation names, and non-fixed Route 53 endpoints.
+- **Predecessors:** T4 and approved direct-API/parser dependency choice.
 
 #### T6: Implement bounded DNS-only resolution evidence collection
 
@@ -613,8 +620,9 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 - [x] **T1 — Create the isolated v2 JavaScript foundation.** The React/Vite JavaScript foundation, placeholder worker/control-plane module boundaries, repository-defined npm scripts, Vitest/Istanbul coverage, ESLint configuration, baseline tests, generated-file ignore rules, and generated npm lockfile are complete; the task is committed as `703690a`. No scanning, HTTP/API, persistence, provider, container, or deployment behavior was introduced.
 - [x] **T2 — Implement centralized configuration, errors, and structured redaction.** Strict AJV schemas, a centralized allowlisted configuration loader, normalized immutable configuration, typed errors, structured redaction, logical-source logging, and focused unit/security-review coverage are complete.
 - [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete as `cbe294b`.
-- [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete; the task commit is pending.
-- [ ] **T5–T20 and T15A — Pending.**
+- [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete as `678521d`.
+- [x] **T5 — Implement Route 53 collection with explicit coverage reporting.** The direct read-only Query API adapter, native SigV4 signing, central credential resolution, bounded XML parsing, manual zone enablement, canonical normalization, typed coverage outcomes, fixtures, direct-client architecture guard, deployment guide, and focused secure-code review are complete; the task commit is pending.
+- [ ] **T6–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -658,9 +666,20 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 54 passing tests; the opt-in owner-provided database integration test remains skipped locally. |
 | Scope boundary | No AWS SDK/provider dependency, provider credential handling, live DNS query, adapter collection implementation, persistence schema change, HTTP endpoint, authentication change, container, Kubernetes, or CI behavior was introduced. |
 
+### T5 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Direct client and credential boundary | Added a read-only Route 53 Query API client with native Node.js SigV4 signing, a fixed standard-partition HTTPS endpoint, exact `route53`/`us-east-1` scope, signed optional session-token support, no ambient credential discovery, no STS role assumption, and no AWS SDK dependency. The central configuration loader resolves only explicitly declared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` values. |
+| Collection and coverage fidelity | Added full hosted-zone (`NextMarker`) and record-set (`NextRecordName`, `NextRecordType`, `NextRecordIdentifier`) pagination; manual owner-enabled zone selection; public/private zone normalization; supported A/AAAA/CNAME/MX/NS/alias record normalization; stable record identity with content-sensitive version; and typed success/partial/failure coverage outcomes for authentication, authorization, throttling, network, malformed-response, pagination, configuration, and unavailable-scope conditions. |
+| Outbound and XML hardening | Signed requests are GET-only, use a fixed endpoint, reject redirects and non-XML content types, bound timeout/retry/page/response-size behavior, prohibit DTD/entity declarations, disable XML entity processing, limit nesting depth, and never retain raw provider XML as a general artifact. An architecture test blocks AWS SDK imports, common mutation-operation names, endpoint drift, direct driver access, direct UUID use, and scattered `process.env` reads. |
+| Documentation and review | Added `docs/providers/route53-direct-api.md` with owner credential/IAM/zone-enablement guidance and `Secure Code Review - 2026-08-20.md`. The focused review recorded two remediated implementation findings and one owner-controlled live AWS signing smoke-test follow-up. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 71 passing tests; the opt-in owner-provided MySQL integration test remains skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
+| Scope boundary | No Route 53 mutation, AWS SDK, AWS CLI, direct DNS query, ownership inventory, persistence schema, HTTP route, authentication change, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T4 Complete — T5 Awaiting Selection and Approval**
+**T5 Complete — T6 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

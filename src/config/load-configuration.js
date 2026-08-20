@@ -95,6 +95,72 @@ function parseProviderCredentialReferences(value) {
   }
 }
 
+const route53CredentialKeys = Object.freeze([
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+]);
+
+function resolveProviderCredentials(references, environment) {
+  const seenProviders = new Set();
+
+  return references.map((reference) => {
+    if (seenProviders.has(reference.provider)) {
+      failConfiguration('Provider credential references must not repeat a provider.', [
+        {
+          keyword: 'uniqueItems',
+          message: 'Duplicate provider credential reference.',
+          params: { provider: reference.provider },
+        },
+      ]);
+    }
+    seenProviders.add(reference.provider);
+
+    if (reference.provider === 'route53') {
+      const unsupportedKeys = reference.secretEnvironmentKeys.filter(
+        (key) => !route53CredentialKeys.includes(key),
+      );
+      const missingRequiredKeys = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'].filter(
+        (key) => !reference.secretEnvironmentKeys.includes(key),
+      );
+
+      if (unsupportedKeys.length > 0 || missingRequiredKeys.length > 0) {
+        failConfiguration('Route 53 credential references are invalid.', [
+          {
+            keyword: 'route53Credentials',
+            message: 'Route 53 requires AWS access-key and secret-access-key references only, with an optional session token reference.',
+            params: {
+              unsupportedKeys,
+              missingRequiredKeys,
+            },
+          },
+        ]);
+      }
+    }
+
+    const missingValues = reference.secretEnvironmentKeys.filter(
+      (key) => typeof environment[key] !== 'string' || environment[key].length === 0,
+    );
+
+    if (missingValues.length > 0) {
+      failConfiguration('A declared provider credential value is missing.', [
+        {
+          keyword: 'required',
+          message: 'Declared provider credential environment value is missing.',
+          params: { provider: reference.provider, missingValues },
+        },
+      ]);
+    }
+
+    return {
+      provider: reference.provider,
+      values: Object.fromEntries(
+        reference.secretEnvironmentKeys.map((key) => [key, environment[key]]),
+      ),
+    };
+  });
+}
+
 function deepFreeze(value) {
   if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
     return value;
@@ -105,7 +171,7 @@ function deepFreeze(value) {
   return value;
 }
 
-function normalizeRuntimeEnvironment(environment) {
+function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
   const providerCredentialReferences = parseProviderCredentialReferences(
     environment.GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON,
   );
@@ -143,6 +209,7 @@ function normalizeRuntimeEnvironment(environment) {
     },
     rawEvidenceEnabled: parseBoolean(environment.GHOST_RECORDS_RAW_EVIDENCE_ENABLED),
     providerCredentialReferences,
+    providerCredentials: resolveProviderCredentials(providerCredentialReferences, sourceEnvironment),
   };
 }
 
@@ -156,7 +223,7 @@ export function loadConfiguration({ environment = process.env } = {}) {
     );
   }
 
-  const normalizedConfiguration = normalizeRuntimeEnvironment(runtimeEnvironment);
+  const normalizedConfiguration = normalizeRuntimeEnvironment(runtimeEnvironment, environment);
 
   if (!validateNormalizedRuntimeConfig(normalizedConfiguration)) {
     failConfiguration(
