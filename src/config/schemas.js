@@ -26,6 +26,8 @@ export const RUNTIME_ENVIRONMENT_KEYS = Object.freeze([
   'GHOST_RECORDS_DNS_MAX_CONCURRENCY',
   'GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS',
   'GHOST_RECORDS_DNS_MAX_ANSWERS',
+  'GHOST_RECORDS_AWS_EC2_REGIONS_JSON',
+  'GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON',
 ]);
 
 const booleanStringSchema = {
@@ -121,6 +123,8 @@ export const runtimeEnvironmentSchema = {
     GHOST_RECORDS_DNS_MAX_CONCURRENCY: positiveIntegerStringSchema,
     GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS: positiveIntegerStringSchema,
     GHOST_RECORDS_DNS_MAX_ANSWERS: positiveIntegerStringSchema,
+    GHOST_RECORDS_AWS_EC2_REGIONS_JSON: { type: 'string', minLength: 2 },
+    GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: { type: 'string', minLength: 2 },
   },
 };
 
@@ -151,6 +155,38 @@ export const providerCredentialReferencesSchema = {
   },
 };
 
+export const approvedExternalPolicySchema = {
+  $id: 'https://ghost-records.dev/schemas/approved-external-policy.json',
+  type: 'array',
+  maxItems: 1000,
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['policyId', 'target', 'scope', 'owner', 'reason', 'expiresAt'],
+    properties: {
+      policyId: { type: 'string', minLength: 1, maxLength: 191, pattern: '^[A-Za-z0-9][A-Za-z0-9._:/@-]*$' },
+      target: { type: 'string', minLength: 1, maxLength: 1024 },
+      scope: { type: 'string', minLength: 1, maxLength: 512 },
+      owner: { type: 'string', minLength: 1, maxLength: 256 },
+      reason: { type: 'string', minLength: 1, maxLength: 1024 },
+      expiresAt: { type: 'string', minLength: 20, maxLength: 40, pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$' },
+    },
+  },
+};
+
+export const awsEc2RegionSchema = {
+  $id: 'https://ghost-records.dev/schemas/aws-ec2-regions.json',
+  type: 'array',
+  maxItems: 50,
+  uniqueItems: true,
+  items: {
+    type: 'string',
+    pattern: '^[a-z]{2}-[a-z0-9-]+-\\d+$',
+    minLength: 5,
+    maxLength: 32,
+  },
+};
+
 export const normalizedRuntimeConfigSchema = {
   $id: 'https://ghost-records.dev/schemas/normalized-runtime-config.json',
   type: 'object',
@@ -165,6 +201,7 @@ export const normalizedRuntimeConfigSchema = {
     'providerCredentialReferences',
     'providerCredentials',
     'dns',
+    'aws',
   ],
   properties: {
     environment: {
@@ -249,6 +286,15 @@ export const normalizedRuntimeConfigSchema = {
         maxConcurrency: { type: 'integer', minimum: 1, maximum: 32 },
         queryTimeoutMs: { type: 'integer', minimum: 1, maximum: 30000 },
         maxAnswers: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+    },
+    aws: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['ec2Regions', 'approvedExternalPolicies'],
+      properties: {
+        ec2Regions: { $ref: 'https://ghost-records.dev/schemas/aws-ec2-regions.json' },
+        approvedExternalPolicies: { $ref: 'https://ghost-records.dev/schemas/approved-external-policy.json' },
       },
     },
     providerCredentials: {

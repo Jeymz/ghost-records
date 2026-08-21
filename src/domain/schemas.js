@@ -40,6 +40,11 @@ const providerSchema = {
   enum: PROVIDERS,
 };
 
+const coverageProviderSchema = {
+  type: 'string',
+  enum: [...PROVIDERS, 'aws-ec2'],
+};
+
 const addressClassificationSchema = {
   type: 'string',
   enum: [
@@ -74,7 +79,7 @@ const coverageReasonSchema = {
 
 const coverageEventProperties = {
   component: { type: 'string', minLength: 1, maxLength: 128 },
-  provider: providerSchema,
+  provider: coverageProviderSchema,
   scope: { type: 'string', minLength: 1, maxLength: 512 },
   status: { type: 'string', enum: ['complete', 'partial', 'failed'] },
   reason: coverageReasonSchema,
@@ -322,6 +327,24 @@ export const ownershipEvidenceSchema = {
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
     observedAt: timestampSchema,
     coverage: { type: 'string', enum: ['complete', 'partial', 'failed'] },
+    details: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        credentialAccountId: { type: 'string', pattern: '^\\d{12}$' },
+        region: { type: 'string', minLength: 5, maxLength: 32 },
+        allocationId: { type: 'string', minLength: 1, maxLength: 191 },
+        associationId: { type: 'string', minLength: 1, maxLength: 191 },
+        instanceId: { type: 'string', minLength: 1, maxLength: 191 },
+        networkInterfaceId: { type: 'string', minLength: 1, maxLength: 191 },
+        networkInterfaceOwnerId: { type: 'string', pattern: '^\\d{12}$' },
+        associationState: { type: 'string', enum: ['idle', 'associated', 'cross-account-associated', 'unknown'] },
+        policyId: identifierSchema,
+        policyOwner: { type: 'string', minLength: 1, maxLength: 256 },
+        policyReason: { type: 'string', minLength: 1, maxLength: 1024 },
+        policyExpiresAt: timestampSchema,
+      },
+    },
   },
 };
 
@@ -585,7 +608,8 @@ const ownershipPartialOutcomeSchema = {
       type: 'array',
       minItems: 1,
       maxItems: 100,
-      items: {
+      items: { $ref: coverageEventSchema.$id },
+      contains: {
         allOf: [
           { $ref: coverageEventSchema.$id },
           {

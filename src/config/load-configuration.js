@@ -2,6 +2,8 @@ import Ajv from 'ajv';
 
 import { ConfigurationError } from '../errors/application-error.js';
 import {
+  approvedExternalPolicySchema,
+  awsEc2RegionSchema,
   normalizedRuntimeConfigSchema,
   providerCredentialReferencesSchema,
   RUNTIME_ENVIRONMENT_KEYS,
@@ -15,6 +17,10 @@ const ajv = new Ajv({
 });
 
 ajv.addSchema(providerCredentialReferencesSchema);
+ajv.addSchema(approvedExternalPolicySchema);
+ajv.addSchema(awsEc2RegionSchema);
+const validateAwsEc2Regions = ajv.getSchema(awsEc2RegionSchema.$id);
+const validateApprovedExternalPolicies = ajv.getSchema(approvedExternalPolicySchema.$id);
 const validateRuntimeEnvironment = ajv.compile(runtimeEnvironmentSchema);
 const validateNormalizedRuntimeConfig = ajv.compile(normalizedRuntimeConfigSchema);
 
@@ -42,6 +48,8 @@ const runtimeDefaults = Object.freeze({
   GHOST_RECORDS_DNS_MAX_CONCURRENCY: '4',
   GHOST_RECORDS_DNS_QUERY_TIMEOUT_MS: '3000',
   GHOST_RECORDS_DNS_MAX_ANSWERS: '100',
+  GHOST_RECORDS_AWS_EC2_REGIONS_JSON: '[]',
+  GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: '[]',
 });
 
 function formatSchemaErrors(errors) {
@@ -92,12 +100,91 @@ function parseInteger(value) {
   return Number.parseInt(value, 10);
 }
 
-function parseProviderCredentialReferences(value) {
+function parseJsonConfiguration(value, message) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    failConfiguration('Provider credential references must be valid JSON.', undefined, error);
+    failConfiguration(message, undefined, error);
   }
+}
+
+function parseProviderCredentialReferences(value) {
+  return parseJsonConfiguration(value, 'Provider credential references must be valid JSON.');
+}
+
+function parseAwsEc2Regions(value) {
+  return parseJsonConfiguration(value, 'AWS EC2 regions must be valid JSON.');
+}
+
+function parseApprovedExternalPolicies(value) {
+  return parseJsonConfiguration(value, 'Approved external policies must be valid JSON.');
+}
+
+function validateParsedConfiguration(value, validator, message) {
+  if (!validator(value)) {
+    failConfiguration(message, formatSchemaErrors(validator.errors));
+  }
+  return value;
+}
+
+function isCalendarTimestamp(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const expectedSecond = value.replace(/(?:\.\d{1,9})?Z$/u, 'Z');
+  const actualSecond = `${parsed.toISOString().slice(0, 19)}Z`;
+  return expectedSecond === actualSecond;
+}
+
+function validateStandardAwsRegions(regions) {
+  const unsupportedRegion = regions.find((region) =>
+    /^(?:cn-|us-gov-|us-iso-)/u.test(region),
+  );
+  if (unsupportedRegion) {
+    failConfiguration('AWS EC2 region is outside the supported standard-partition endpoint model.', [
+      {
+        keyword: 'unsupported-scope',
+        message: 'AWS China, GovCloud, and isolated partitions require a separately approved endpoint model.',
+        params: { region: unsupportedRegion },
+      },
+    ]);
+  }
+  return regions;
+}
+
+function validatePolicyTimestamps(policies) {
+  for (const policy of policies) {
+    if (!isCalendarTimestamp(policy.expiresAt)) {
+      failConfiguration('Approved external policy expiry must be a valid timestamp.', [
+        {
+          keyword: 'format',
+          message: 'Approved external policy expiry is invalid.',
+          params: { policyId: policy.policyId },
+        },
+      ]);
+    }
+  }
+
+  return policies;
+}
+
+function rejectDuplicatePolicyIds(policies) {
+  const seenPolicyIds = new Set();
+
+  for (const policy of policies) {
+    if (seenPolicyIds.has(policy.policyId)) {
+      failConfiguration('Approved external policy records must not repeat a policy ID.', [
+        {
+          keyword: 'uniqueItems',
+          message: 'Duplicate approved external policy ID.',
+          params: { policyId: policy.policyId },
+        },
+      ]);
+    }
+    seenPolicyIds.add(policy.policyId);
+  }
+
+  return policies;
 }
 
 const route53CredentialKeys = Object.freeze([
@@ -180,6 +267,22 @@ function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
   const providerCredentialReferences = parseProviderCredentialReferences(
     environment.GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON,
   );
+  const ec2Regions = validateStandardAwsRegions(
+    validateParsedConfiguration(
+      parseAwsEc2Regions(environment.GHOST_RECORDS_AWS_EC2_REGIONS_JSON),
+      validateAwsEc2Regions,
+      'AWS EC2 regions must satisfy the required schema.',
+    ),
+  );
+  const approvedExternalPolicies = rejectDuplicatePolicyIds(
+    validatePolicyTimestamps(
+      validateParsedConfiguration(
+        parseApprovedExternalPolicies(environment.GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON),
+        validateApprovedExternalPolicies,
+        'Approved external policies must satisfy the required schema.',
+      ),
+    ),
+  );
 
   return {
     environment: environment.NODE_ENV,
@@ -213,6 +316,10 @@ function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
       rawEvidenceDays: parseInteger(environment.GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS),
     },
     rawEvidenceEnabled: parseBoolean(environment.GHOST_RECORDS_RAW_EVIDENCE_ENABLED),
+    aws: {
+      ec2Regions,
+      approvedExternalPolicies,
+    },
     dns: {
       maxChainDepth: parseInteger(environment.GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH),
       maxQueries: parseInteger(environment.GHOST_RECORDS_DNS_MAX_QUERIES),

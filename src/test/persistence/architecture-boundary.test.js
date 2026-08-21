@@ -63,6 +63,27 @@ describe('persistence architecture boundary', () => {
     expect(signer).toContain("export const ROUTE53_ENDPOINT = 'https://route53.amazonaws.com'");
   });
 
+  it('keeps AWS ownership evidence direct, read-only, and fixed-scope', async () => {
+    const awsRoot = path.join(sourceRoot, 'adapters', 'aws');
+    const ec2Root = path.join(sourceRoot, 'adapters', 'ec2');
+    const awsFiles = [
+      ...(await collectJavaScriptFiles(awsRoot)),
+      ...(await collectJavaScriptFiles(ec2Root)),
+    ];
+
+    for (const filePath of awsFiles) {
+      const content = await readFile(filePath, 'utf8');
+      expect(content).not.toMatch(/from ['"]@aws-sdk\//u);
+      expect(content).not.toMatch(/require\(['"]@aws-sdk\//u);
+      expect(content).not.toMatch(/(?:AllocateAddress|ReleaseAddress|AssociateAddress|DisassociateAddress|AssumeRole|DescribeRegions)/u);
+      expect(content).not.toMatch(/(?:AWS_CONTAINER_CREDENTIALS|AWS_WEB_IDENTITY_TOKEN_FILE|169\.254\.169\.254)/u);
+    }
+
+    const client = await readFile(path.join(awsRoot, 'client.js'), 'utf8');
+    expect(client).toContain("export const STS_ENDPOINT = 'https://sts.amazonaws.com'");
+    expect(client).toContain('https://ec2.${assertRegion(region)}.amazonaws.com');
+  });
+
   it('keeps DNS evidence collection DNS-only without HTTP, TLS, socket, or process execution paths', async () => {
     const dnsRoot = path.join(sourceRoot, 'dns');
     const dnsFiles = await collectJavaScriptFiles(dnsRoot);

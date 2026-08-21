@@ -471,7 +471,7 @@ Every task is independently reviewable. A task may begin only after all listed p
 - **Expected tests / validation:** Deterministic resolver fixtures for CNAME loops, multi-value/IPv6 answers, resolver errors, wildcard/split-horizon assumptions, depth/query limits, and DNS-only egress architecture tests proving no HTTP/TLS/application target path exists.
 - **Predecessors:** T3 and T4.
 
-#### T7: Implement AWS ownership evidence and approved-external policy
+#### T7: [x] Implement AWS ownership evidence and approved-external policy
 
 - **Objective:** Add the initial ownership/context layer needed to distinguish owned, approved external, unknown, unavailable, and not-found targets.
 - **Specific changes:** Implement read-only AWS Elastic IP/resource inventory evidence, approved-external target policy records, policy owner/reason/scope/expiry requirements, and coverage-aware ownership classification.
@@ -622,8 +622,9 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 - [x] **T3 — Establish Sequelize-only MySQL infrastructure and migration lifecycle.** Sequelize-only connection, model/repository, readiness, controlled migration/rollback, connection-budget, owner-provided integration-path, and UUID-advisory mitigation foundations are complete as `cbe294b`.
 - [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete as `678521d`.
 - [x] **T5 — Implement Route 53 collection with explicit coverage reporting.** The direct read-only Query API adapter, native SigV4 signing, central credential resolution, bounded XML parsing, manual zone enablement, canonical normalization, typed coverage outcomes, fixtures, direct-client architecture guard, deployment guide, and focused secure-code review are complete as `6e39bb9`.
-- [x] **T6 — Implement bounded DNS-only resolution evidence collection.** The native `node:dns/promises` resolver, strict normalized hostname/batch input boundary, centrally configured depth/query/concurrency/timeout/answer limits, CNAME chain/cycle handling, A/AAAA TTL/classification evidence, explicit resolver coverage taxonomy, DNS-only architecture guard, operating guide, and focused secure-code review are complete; the task commit is pending.
-- [ ] **T7–T20 and T15A — Pending.**
+- [x] **T6 — Implement bounded DNS-only resolution evidence collection.** The native `node:dns/promises` resolver, strict normalized hostname/batch input boundary, centrally configured depth/query/concurrency/timeout/answer limits, CNAME chain/cycle handling, A/AAAA TTL/classification evidence, explicit resolver coverage taxonomy, DNS-only architecture guard, operating guide, and focused secure-code review are complete as `50353df`.
+- [x] **T7 — Implement AWS ownership evidence and approved-external policy.** The SDK-free direct STS/EC2 Query client, fixed read-only service scope, explicit standard-partition regions, strict expiring exact-match approved-external policies, typed EIP ownership/coverage outcomes, fixtures, architecture guard, operating guide, and focused secure-code review are complete; the task commit is pending.
+- [ ] **T8–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -689,9 +690,21 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 87 passing tests; the opt-in owner-provided MySQL integration test remains skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
 | Scope boundary | No HTTP/TLS/application probing, reverse DNS, DNS server configuration, DNSSEC claim, provider integration, ownership inventory, persistence write, API/UI/authentication, container, Kubernetes, or CI behavior was introduced. |
 
+### T7 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Direct AWS boundary | Added an SDK-free direct AWS Query client using native Node.js SigV4, fixed HTTPS STS `GetCallerIdentity`, and fixed-form regional EC2 `DescribeAddresses` requests. It reuses explicitly declared static or session credentials, adds no ambient credential discovery, role assumption, region discovery, AWS CLI, or mutation action. |
+| Ownership evidence fidelity | Added exact credential-account identity binding, explicit standard-partition region inventory, EIP allocation/association/ENI context, idle and cross-account-association context, complete `not-found`, partial `unknown`, and failed unavailable-inventory outcomes. No inaccessible or partial inventory outcome is classified as owned, unowned, claimable, or a confirmed takeover. |
+| Approved-external policy | Added strict centrally validated policy records with required policy ID, target, scope, owner, reason, and expiry. Matching is exact normalized IP/hostname plus exact scope; wildcard, CIDR, suffix, cross-scope, malformed, duplicate, invalid-calendar, and expired policies cannot create an active suppression. Expired policies remain contextual non-suppressing evidence. |
+| Outbound/XML hardening | The direct client permits only HTTPS, signed GET, fixed STS and derived validated EC2 standard-partition endpoints, bounded retries, bounded XML content, and strict XML root/declaration/entity/depth handling. The architecture guard rejects SDK imports, EIP mutation names, role assumption, dynamic region discovery, and ambient credential sources. |
+| Documentation and review | Added `docs/providers/aws-eip-ownership.md` and `Secure Code Review - 2026-08-21 - T7.md`. The focused review records two remediated findings and the required owner-provided non-production STS/EC2/IAM smoke-test follow-up. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 109 passing tests and one opt-in owner-provided MySQL integration test skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
+| Scope boundary | No AWS mutation, provider DNS collection change, DNS resolver change, persistence write/model, analyzer, reporting artifact, HTTP/API/authentication, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T6 Complete — T7 Awaiting Selection and Approval**
+**T7 Complete — T8 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

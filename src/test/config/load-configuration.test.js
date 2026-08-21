@@ -69,6 +69,10 @@ describe('loadConfiguration', () => {
         queryTimeoutMs: 3000,
         maxAnswers: 100,
       },
+      aws: {
+        ec2Regions: [],
+        approvedExternalPolicies: [],
+      },
     });
     expect(Object.isFrozen(configuration)).toBe(true);
     expect(Object.isFrozen(configuration.database.pool)).toBe(true);
@@ -200,6 +204,112 @@ describe('loadConfiguration', () => {
             {
               provider: 'route53',
               secretEnvironmentKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+            },
+          ]),
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('normalizes explicit EC2 regions and expiring approved-external policies', () => {
+    const configuration = loadConfiguration({
+      environment: buildEnvironment({
+        GHOST_RECORDS_AWS_EC2_REGIONS_JSON: JSON.stringify(['us-east-1', 'us-west-2']),
+        GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: JSON.stringify([
+          {
+            policyId: 'external-cdn-2026',
+            target: 'cdn.partner.example',
+            scope: 'route53:123456789012:ZEXAMPLE',
+            owner: 'Application Security',
+            reason: 'Approved managed CDN dependency',
+            expiresAt: '2026-12-31T00:00:00Z',
+          },
+        ]),
+      }),
+    });
+
+    expect(configuration.aws).toEqual({
+      ec2Regions: ['us-east-1', 'us-west-2'],
+      approvedExternalPolicies: [
+        {
+          policyId: 'external-cdn-2026',
+          target: 'cdn.partner.example',
+          scope: 'route53:123456789012:ZEXAMPLE',
+          owner: 'Application Security',
+          reason: 'Approved managed CDN dependency',
+          expiresAt: '2026-12-31T00:00:00Z',
+        },
+      ],
+    });
+  });
+
+  it('fails closed for malformed, duplicate, or unexpected T7 policy configuration', () => {
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({ GHOST_RECORDS_AWS_EC2_REGIONS_JSON: '["not-a-region"]' }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: JSON.stringify([
+            {
+              policyId: 'duplicate',
+              target: '198.51.100.10',
+              scope: 'route53:123456789012:ZEXAMPLE',
+              owner: 'Application Security',
+              reason: 'Temporary exception',
+              expiresAt: '2026-12-31T00:00:00Z',
+            },
+            {
+              policyId: 'duplicate',
+              target: '198.51.100.11',
+              scope: 'route53:123456789012:ZEXAMPLE',
+              owner: 'Application Security',
+              reason: 'Temporary exception',
+              expiresAt: '2026-12-31T00:00:00Z',
+            },
+          ]),
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({ GHOST_RECORDS_AWS_EC2_REGIONS_JSON: '["us-gov-west-1"]' }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: JSON.stringify([
+            {
+              policyId: 'invalid-calendar-date',
+              target: '198.51.100.10',
+              scope: 'route53:123456789012:ZEXAMPLE',
+              owner: 'Application Security',
+              reason: 'Temporary exception',
+              expiresAt: '2026-02-30T00:00:00Z',
+            },
+          ]),
+        }),
+      }),
+    ).toThrow(ConfigurationError);
+
+    expect(() =>
+      loadConfiguration({
+        environment: buildEnvironment({
+          GHOST_RECORDS_APPROVED_EXTERNAL_POLICIES_JSON: JSON.stringify([
+            {
+              policyId: 'unexpected-field',
+              target: '198.51.100.10',
+              scope: 'route53:123456789012:ZEXAMPLE',
+              owner: 'Application Security',
+              reason: 'Temporary exception',
+              expiresAt: '2026-12-31T00:00:00Z',
+              wildcard: true,
             },
           ]),
         }),
