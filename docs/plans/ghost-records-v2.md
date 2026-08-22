@@ -336,7 +336,7 @@ Any future HTTP API, UI, or inbound scan-job message materially expands the trus
 
 ## Implementation Notes
 
-Implementation is underway on `feat-ghost_records_v2_implementation`. T1 through T5 are committed as individual scoped tasks. T6 provides the validated native DNS-only resolver, has completed review, and awaits its scoped task commit; T7 and later tasks remain gated by their documented approvals and prerequisites.
+Implementation is underway on `feat-ghost_records_v2_implementation`. T1 through T7 are committed as individual scoped tasks. T8 has completed validation and awaits its scoped task commit; T9 and later tasks remain gated by their documented approvals and prerequisites.
 
 ## Change Summary
 
@@ -623,8 +623,9 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 - [x] **T4 — Define canonical domain schemas and adapter contracts.** Strict canonical AJV schemas, immutable validated objects, typed provider/ownership adapter success/partial/failure outcomes, and fixture tests are complete as `678521d`.
 - [x] **T5 — Implement Route 53 collection with explicit coverage reporting.** The direct read-only Query API adapter, native SigV4 signing, central credential resolution, bounded XML parsing, manual zone enablement, canonical normalization, typed coverage outcomes, fixtures, direct-client architecture guard, deployment guide, and focused secure-code review are complete as `6e39bb9`.
 - [x] **T6 — Implement bounded DNS-only resolution evidence collection.** The native `node:dns/promises` resolver, strict normalized hostname/batch input boundary, centrally configured depth/query/concurrency/timeout/answer limits, CNAME chain/cycle handling, A/AAAA TTL/classification evidence, explicit resolver coverage taxonomy, DNS-only architecture guard, operating guide, and focused secure-code review are complete as `50353df`.
-- [x] **T7 — Implement AWS ownership evidence and approved-external policy.** The SDK-free direct STS/EC2 Query client, fixed read-only service scope, explicit standard-partition regions, strict expiring exact-match approved-external policies, typed EIP ownership/coverage outcomes, fixtures, architecture guard, operating guide, and focused secure-code review are complete; the task commit is pending.
-- [ ] **T8–T20 and T15A — Pending.**
+- [x] **T7 — Implement AWS ownership evidence and approved-external policy.** The SDK-free direct STS/EC2 Query client, fixed read-only service scope, explicit standard-partition regions, strict expiring exact-match approved-external policies, typed EIP ownership/coverage outcomes, fixtures, architecture guard, operating guide, and focused secure-code review are complete as `a06558d`.
+- [x] **T8 — Implement historical evidence, minimized registration observations, and retention foundations.** The Sequelize-backed resolution/registration/policy/finding history foundation, owner-allowlisted IANA-bootstrap RDAP collection, raw-evidence hard-disable, and leased bounded retention foundation are complete; the scoped task commit is pending.
+- [ ] **T9–T20 and T15A — Pending.**
 
 ### T1 Completion Record
 
@@ -702,9 +703,21 @@ The imported `plan-feat` workflow has been applied by adding this task-level pla
 | Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 109 passing tests and one opt-in owner-provided MySQL integration test skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
 | Scope boundary | No AWS mutation, provider DNS collection change, DNS resolver change, persistence write/model, analyzer, reporting artifact, HTTP/API/authentication, container, Kubernetes, or CI behavior was introduced. |
 
+### T8 Completion Record
+
+| Item | Completed work |
+| --- | --- |
+| Historical evidence | Added a reversible Sequelize migration and model/repository/service boundary for normalized resolution snapshots, minimized registration observations, policy decisions, finding-history placeholders, retention metadata, and a retention lease. Resolution history records canonical query/chain/terminal-answer/rcode/coverage evidence and returns `no-baseline`, `unchanged`, or `changed` drift state without creating a finding. |
+| Minimized RDAP boundary | Added a direct read-only RDAP client using the fixed IANA bootstrap HTTPS source, validated/cached bootstrap document, owner-configured HTTPS service-root allowlist, exact domain lookup, redirect refusal, bounded streaming response handling, and no WHOIS client. It persists only normalized protocol fields and a SHA-256 response fingerprint; contact/entity/vCard/raw JSON/body values are excluded. |
+| Raw-evidence boundary | The owner selected the minimized-evidence default. T8 enforces `GHOST_RECORDS_RAW_EVIDENCE_ENABLED=false` and `GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS=0`; no raw-evidence table, repository, or client output is present. An encrypted opt-in raw-evidence capability remains a separate future approval. |
+| Retention | Added strict owner-configured retention actor/lease/batch settings and a database-leased, idempotent, bounded Sequelize purge service. The actor is disabled by default, records aggregate counts only, updates retention metadata transactionally, and does not claim database backup/recovery responsibility. |
+| Documentation and review | Added `docs/registration/rdap-minimized-evidence.md`, `docs/retention/historical-evidence-retention.md`, and `Secure Code Review - 2026-08-22 - T8.md`. The review records three remediated code-anchored findings: streaming response limits, per-domain bootstrap suffix selection, and explicit raw-evidence hard-disable. |
+| Validation | `npm ci`, `npm run audit`, `npm run lint`, `npm run test:run`, `npm run test:integration`, `npm run coverage`, and `npm run build` passed. The suite has 124 tests with one opt-in owner-provided MySQL integration test skipped locally. `npm audit` continues to report only the separately documented/accepted Sequelize transitive UUID moderate advisory entries and no high or critical finding. |
+| Scope boundary | No WHOIS, raw RDAP capture, RDAP mutation, provider DNS adapter, DNS resolver change, analyzer finding, report artifact, API/UI/authentication, container, Kubernetes, or CI behavior was introduced. |
+
 ## Approval Status
 
-**T7 Complete — T8 Awaiting Selection and Approval**
+**T8 Complete — T9 Awaiting Selection and Approval**
 
 
 ## Database Lifecycle and Logical Export Amendment

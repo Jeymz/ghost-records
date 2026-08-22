@@ -24,7 +24,7 @@ function buildEnvironment(overrides = {}) {
     GHOST_RECORDS_RETENTION_HISTORY_DAYS: '365',
     GHOST_RECORDS_RETENTION_REGISTRATION_DAYS: '90',
     GHOST_RECORDS_RETENTION_ARTIFACT_DAYS: '90',
-    GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: '30',
+    GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: '0',
     GHOST_RECORDS_RAW_EVIDENCE_ENABLED: 'false',
     GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: JSON.stringify([
       {
@@ -59,9 +59,16 @@ describe('loadConfiguration', () => {
         historyDays: 365,
         registrationDays: 90,
         artifactDays: 90,
-        rawEvidenceDays: 30,
+        rawEvidenceDays: 0,
+        actorEnabled: false,
+        leaseMs: 60000,
+        batchSize: 500,
       },
       rawEvidenceEnabled: false,
+      registration: {
+        allowedRoots: [],
+        bootstrapCacheTtlMs: 86400000,
+      },
       dns: {
         maxChainDepth: 8,
         maxQueries: 32,
@@ -339,5 +346,46 @@ describe('loadConfiguration', () => {
         }),
       }),
     ).toThrow(ConfigurationError);
+  });
+});
+
+
+describe('T8 minimized registration configuration', () => {
+  it('normalizes owner-approved HTTPS RDAP roots and bounded retention controls', () => {
+    const configuration = loadConfiguration({
+      environment: buildEnvironment({
+        GHOST_RECORDS_RETENTION_ACTOR_ENABLED: 'true',
+        GHOST_RECORDS_RETENTION_LEASE_MS: '120000',
+        GHOST_RECORDS_RETENTION_BATCH_SIZE: '250',
+        GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON: JSON.stringify([
+          'https://rdap.example.test/rdap',
+        ]),
+      }),
+    });
+
+    expect(configuration.registration).toEqual({
+      allowedRoots: ['https://rdap.example.test/rdap/'],
+      bootstrapCacheTtlMs: 86400000,
+    });
+    expect(configuration.retention).toMatchObject({
+      actorEnabled: true,
+      leaseMs: 120000,
+      batchSize: 250,
+      rawEvidenceDays: 0,
+    });
+    expect(configuration.rawEvidenceEnabled).toBe(false);
+  });
+
+  it('fails closed for raw capture, unsafe roots, duplicate normalized roots, or unsafe retention limits', () => {
+    for (const overrides of [
+      { GHOST_RECORDS_RAW_EVIDENCE_ENABLED: 'true' },
+      { GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON: JSON.stringify(['http://rdap.example.test/']) },
+      { GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON: JSON.stringify(['https://rdap.example.test', 'https://rdap.example.test/']) },
+      { GHOST_RECORDS_RETENTION_LEASE_MS: '1' },
+    ]) {
+      expect(() => loadConfiguration({ environment: buildEnvironment(overrides) })).toThrow(
+        ConfigurationError,
+      );
+    }
   });
 });

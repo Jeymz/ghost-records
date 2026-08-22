@@ -6,6 +6,7 @@ import {
   awsEc2RegionSchema,
   normalizedRuntimeConfigSchema,
   providerCredentialReferencesSchema,
+  rdapAllowedRootsSchema,
   RUNTIME_ENVIRONMENT_KEYS,
   runtimeEnvironmentSchema,
 } from './schemas.js';
@@ -19,6 +20,8 @@ const ajv = new Ajv({
 ajv.addSchema(providerCredentialReferencesSchema);
 ajv.addSchema(approvedExternalPolicySchema);
 ajv.addSchema(awsEc2RegionSchema);
+ajv.addSchema(rdapAllowedRootsSchema);
+const validateRdapAllowedRoots = ajv.getSchema(rdapAllowedRootsSchema.$id);
 const validateAwsEc2Regions = ajv.getSchema(awsEc2RegionSchema.$id);
 const validateApprovedExternalPolicies = ajv.getSchema(approvedExternalPolicySchema.$id);
 const validateRuntimeEnvironment = ajv.compile(runtimeEnvironmentSchema);
@@ -40,8 +43,13 @@ const runtimeDefaults = Object.freeze({
   GHOST_RECORDS_RETENTION_HISTORY_DAYS: '365',
   GHOST_RECORDS_RETENTION_REGISTRATION_DAYS: '90',
   GHOST_RECORDS_RETENTION_ARTIFACT_DAYS: '90',
-  GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: '30',
+  GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: '0',
+  GHOST_RECORDS_RETENTION_ACTOR_ENABLED: 'false',
+  GHOST_RECORDS_RETENTION_LEASE_MS: '60000',
+  GHOST_RECORDS_RETENTION_BATCH_SIZE: '500',
   GHOST_RECORDS_RAW_EVIDENCE_ENABLED: 'false',
+  GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON: '[]',
+  GHOST_RECORDS_RDAP_BOOTSTRAP_CACHE_TTL_MS: '86400000',
   GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: '[]',
   GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH: '8',
   GHOST_RECORDS_DNS_MAX_QUERIES: '32',
@@ -118,6 +126,47 @@ function parseAwsEc2Regions(value) {
 
 function parseApprovedExternalPolicies(value) {
   return parseJsonConfiguration(value, 'Approved external policies must be valid JSON.');
+}
+
+function parseRdapAllowedRoots(value) {
+  return parseJsonConfiguration(value, 'RDAP allowed roots must be valid JSON.');
+}
+
+function normalizeRdapRoot(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch (error) {
+    failConfiguration('RDAP allowed roots must be valid HTTPS URLs.', undefined, error);
+  }
+
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.search ||
+    url.hash ||
+    /^[0-9.:[\]]+$/u.test(url.hostname)
+  ) {
+    failConfiguration('RDAP allowed roots must be credential-free HTTPS hostnames without ports, query strings, fragments, or IP literals.');
+  }
+
+  return `${url.origin}${url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`}`;
+}
+
+function validateAndNormalizeRdapRoots(value) {
+  const roots = validateParsedConfiguration(
+    parseRdapAllowedRoots(value),
+    validateRdapAllowedRoots,
+    'RDAP allowed roots must satisfy the required schema.',
+  ).map(normalizeRdapRoot);
+
+  if (new Set(roots).size !== roots.length) {
+    failConfiguration('RDAP allowed roots must not repeat after normalization.');
+  }
+
+  return roots;
 }
 
 function validateParsedConfiguration(value, validator, message) {
@@ -267,6 +316,9 @@ function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
   const providerCredentialReferences = parseProviderCredentialReferences(
     environment.GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON,
   );
+  const rdapAllowedRoots = validateAndNormalizeRdapRoots(
+    environment.GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON,
+  );
   const ec2Regions = validateStandardAwsRegions(
     validateParsedConfiguration(
       parseAwsEc2Regions(environment.GHOST_RECORDS_AWS_EC2_REGIONS_JSON),
@@ -314,8 +366,15 @@ function normalizeRuntimeEnvironment(environment, sourceEnvironment) {
       registrationDays: parseInteger(environment.GHOST_RECORDS_RETENTION_REGISTRATION_DAYS),
       artifactDays: parseInteger(environment.GHOST_RECORDS_RETENTION_ARTIFACT_DAYS),
       rawEvidenceDays: parseInteger(environment.GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS),
+      actorEnabled: parseBoolean(environment.GHOST_RECORDS_RETENTION_ACTOR_ENABLED),
+      leaseMs: parseInteger(environment.GHOST_RECORDS_RETENTION_LEASE_MS),
+      batchSize: parseInteger(environment.GHOST_RECORDS_RETENTION_BATCH_SIZE),
     },
     rawEvidenceEnabled: parseBoolean(environment.GHOST_RECORDS_RAW_EVIDENCE_ENABLED),
+    registration: {
+      allowedRoots: rdapAllowedRoots,
+      bootstrapCacheTtlMs: parseInteger(environment.GHOST_RECORDS_RDAP_BOOTSTRAP_CACHE_TTL_MS),
+    },
     aws: {
       ec2Regions,
       approvedExternalPolicies,

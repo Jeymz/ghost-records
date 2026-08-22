@@ -1,6 +1,7 @@
 import { ValidationError } from '../../errors/application-error.js';
+import { createHistoricalEvidenceMigration } from './20260822-create-historical-evidence.js';
 
-export const migrations = Object.freeze([]);
+export const migrations = Object.freeze([createHistoricalEvidenceMigration]);
 
 export function validateMigrationManifest(manifest = migrations) {
   const migrationIds = new Set();

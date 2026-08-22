@@ -15,6 +15,10 @@ import {
   providerAccountSchema,
   providerCollectionOutcomeSchema,
   providerCollectionRequestSchema,
+  registrationObservationRequestSchema,
+  registrationObservationSchema,
+  resolutionSnapshotRequestSchema,
+  policyDecisionHistorySchema,
   scanArtifactSchema,
   scanJobSchema,
   coverageEventSchema,
@@ -42,6 +46,10 @@ export const DOMAIN_SCHEMA_IDS = Object.freeze({
   providerCollectionOutcome: providerCollectionOutcomeSchema.$id,
   ownershipEvidenceRequest: ownershipEvidenceRequestSchema.$id,
   ownershipEvidenceOutcome: ownershipEvidenceOutcomeSchema.$id,
+  registrationObservationRequest: registrationObservationRequestSchema.$id,
+  registrationObservation: registrationObservationSchema.$id,
+  resolutionSnapshotRequest: resolutionSnapshotRequestSchema.$id,
+  policyDecisionHistory: policyDecisionHistorySchema.$id,
 });
 
 function deepFreeze(value) {

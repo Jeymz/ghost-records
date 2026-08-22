@@ -98,6 +98,24 @@ describe('persistence architecture boundary', () => {
     expect(resolver).toContain("from 'node:dns/promises'");
   });
 
+  it('keeps registration evidence RDAP-only, allowlisted, and minimized', async () => {
+    const registrationRoot = path.join(sourceRoot, 'registration');
+    const registrationFiles = await collectJavaScriptFiles(registrationRoot);
+
+    for (const filePath of registrationFiles) {
+      const content = await readFile(filePath, 'utf8');
+      expect(content).not.toMatch(/\bwhois\b/iu);
+      expect(content).not.toMatch(/from ['"]node:(?:net|tls|dgram|child_process)['"]/u);
+      expect(content).not.toMatch(/redirect:\s*['"]follow['"]/u);
+      expect(content).not.toContain('rawResponse');
+      expect(content).not.toContain('vcardArray');
+    }
+
+    const client = await readFile(path.join(registrationRoot, 'rdap-client.js'), 'utf8');
+    expect(client).toContain("export const IANA_RDAP_BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json'");
+    expect(client).toContain("redirect: 'error'");
+  });
+
   it('keeps process.env access inside the central configuration module', async () => {
     const sourceFiles = await collectJavaScriptFiles(sourceRoot);
 

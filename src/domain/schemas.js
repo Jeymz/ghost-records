@@ -73,6 +73,7 @@ const coverageReasonSchema = {
     'unsupported-scope',
     'configuration',
     'resolver-failure',
+    'not-found',
     'unknown',
   ],
 };
@@ -657,6 +658,104 @@ export const ownershipEvidenceOutcomeSchema = {
   ],
 };
 
+const rdapDomainSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: 253,
+  pattern: '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+\\.?$',
+};
+
+const registrationEventSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['action', 'at'],
+  properties: {
+    action: {
+      type: 'string',
+      enum: ['registration', 'expiration', 'last-changed', 'unknown'],
+    },
+    at: timestampSchema,
+  },
+};
+
+export const registrationObservationRequestSchema = {
+  $id: `${schemaBase}/registration-observation-request.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: ['domain', 'scope'],
+  properties: {
+    domain: rdapDomainSchema,
+    scope: { type: 'string', minLength: 1, maxLength: 512 },
+  },
+};
+
+export const registrationObservationSchema = {
+  $id: `${schemaBase}/registration-observation.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'domain',
+    'sourceRoot',
+    'statuses',
+    'events',
+    'nameservers',
+    'responseHash',
+    'coverageStatus',
+    'observedAt',
+  ],
+  properties: {
+    domain: rdapDomainSchema,
+    handle: { type: 'string', minLength: 1, maxLength: 255 },
+    sourceRoot: { type: 'string', minLength: 12, maxLength: 2048, pattern: '^https://' },
+    registrarHandle: { type: 'string', minLength: 1, maxLength: 255 },
+    statuses: {
+      type: 'array',
+      maxItems: 100,
+      uniqueItems: true,
+      items: { type: 'string', minLength: 1, maxLength: 128 },
+    },
+    events: { type: 'array', maxItems: 20, items: registrationEventSchema },
+    nameservers: {
+      type: 'array',
+      maxItems: 100,
+      uniqueItems: true,
+      items: rdapDomainSchema,
+    },
+    responseHash: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+    coverageStatus: { type: 'string', enum: ['complete', 'partial', 'failed'] },
+    coverageReason: coverageReasonSchema,
+    observedAt: timestampSchema,
+  },
+};
+
+export const resolutionSnapshotRequestSchema = {
+  $id: `${schemaBase}/resolution-snapshot-request.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: ['scope', 'observation'],
+  properties: {
+    scope: { type: 'string', minLength: 1, maxLength: 512 },
+    observation: { $ref: dnsObservationSchema.$id },
+  },
+};
+
+export const policyDecisionHistorySchema = {
+  $id: `${schemaBase}/policy-decision-history.json`,
+  type: 'object',
+  additionalProperties: false,
+  required: ['scope', 'target', 'decision', 'evaluatedAt'],
+  properties: {
+    policyId: identifierSchema,
+    scope: { type: 'string', minLength: 1, maxLength: 512 },
+    target: { type: 'string', minLength: 1, maxLength: 253 },
+    decision: { type: 'string', enum: ['approved', 'expired', 'none'] },
+    owner: { type: 'string', minLength: 1, maxLength: 255 },
+    reason: { type: 'string', minLength: 1, maxLength: 2048 },
+    expiresAt: timestampSchema,
+    evaluatedAt: timestampSchema,
+  },
+};
+
 export const domainSchemas = Object.freeze([
   providerAccountSchema,
   dnsZoneSchema,
@@ -673,6 +772,10 @@ export const domainSchemas = Object.freeze([
   providerCollectionOutcomeSchema,
   ownershipEvidenceRequestSchema,
   ownershipEvidenceOutcomeSchema,
+  registrationObservationRequestSchema,
+  registrationObservationSchema,
+  resolutionSnapshotRequestSchema,
+  policyDecisionHistorySchema,
 ]);
 
 export const canonicalAddressSchema = ipAddressSchema;

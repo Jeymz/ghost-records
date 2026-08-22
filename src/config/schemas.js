@@ -19,7 +19,12 @@ export const RUNTIME_ENVIRONMENT_KEYS = Object.freeze([
   'GHOST_RECORDS_RETENTION_REGISTRATION_DAYS',
   'GHOST_RECORDS_RETENTION_ARTIFACT_DAYS',
   'GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS',
+  'GHOST_RECORDS_RETENTION_ACTOR_ENABLED',
+  'GHOST_RECORDS_RETENTION_LEASE_MS',
+  'GHOST_RECORDS_RETENTION_BATCH_SIZE',
   'GHOST_RECORDS_RAW_EVIDENCE_ENABLED',
+  'GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON',
+  'GHOST_RECORDS_RDAP_BOOTSTRAP_CACHE_TTL_MS',
   'GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON',
   'GHOST_RECORDS_DNS_MAX_CHAIN_DEPTH',
   'GHOST_RECORDS_DNS_MAX_QUERIES',
@@ -113,7 +118,12 @@ export const runtimeEnvironmentSchema = {
     GHOST_RECORDS_RETENTION_REGISTRATION_DAYS: positiveIntegerStringSchema,
     GHOST_RECORDS_RETENTION_ARTIFACT_DAYS: positiveIntegerStringSchema,
     GHOST_RECORDS_RETENTION_RAW_EVIDENCE_DAYS: nonNegativeIntegerStringSchema,
-    GHOST_RECORDS_RAW_EVIDENCE_ENABLED: booleanStringSchema,
+    GHOST_RECORDS_RETENTION_ACTOR_ENABLED: booleanStringSchema,
+    GHOST_RECORDS_RETENTION_LEASE_MS: positiveIntegerStringSchema,
+    GHOST_RECORDS_RETENTION_BATCH_SIZE: positiveIntegerStringSchema,
+    GHOST_RECORDS_RAW_EVIDENCE_ENABLED: { const: 'false' },
+    GHOST_RECORDS_RDAP_ALLOWED_ROOTS_JSON: { type: 'string', minLength: 2 },
+    GHOST_RECORDS_RDAP_BOOTSTRAP_CACHE_TTL_MS: positiveIntegerStringSchema,
     GHOST_RECORDS_PROVIDER_CREDENTIALS_JSON: {
       type: 'string',
       minLength: 2,
@@ -187,6 +197,19 @@ export const awsEc2RegionSchema = {
   },
 };
 
+export const rdapAllowedRootsSchema = {
+  $id: 'https://ghost-records.dev/schemas/rdap-allowed-roots.json',
+  type: 'array',
+  maxItems: 200,
+  uniqueItems: true,
+  items: {
+    type: 'string',
+    minLength: 12,
+    maxLength: 2048,
+    pattern: '^https://',
+  },
+};
+
 export const normalizedRuntimeConfigSchema = {
   $id: 'https://ghost-records.dev/schemas/normalized-runtime-config.json',
   type: 'object',
@@ -198,6 +221,7 @@ export const normalizedRuntimeConfigSchema = {
     'database',
     'retention',
     'rawEvidenceEnabled',
+    'registration',
     'providerCredentialReferences',
     'providerCredentials',
     'dns',
@@ -264,15 +288,27 @@ export const normalizedRuntimeConfigSchema = {
     retention: {
       type: 'object',
       additionalProperties: false,
-      required: ['historyDays', 'registrationDays', 'artifactDays', 'rawEvidenceDays'],
+      required: [        'historyDays', 'registrationDays', 'artifactDays', 'rawEvidenceDays', 'actorEnabled', 'leaseMs', 'batchSize'],
       properties: {
         historyDays: { type: 'integer', minimum: 1 },
         registrationDays: { type: 'integer', minimum: 1 },
         artifactDays: { type: 'integer', minimum: 1 },
-        rawEvidenceDays: { type: 'integer', minimum: 0 },
+        rawEvidenceDays: { const: 0 },
+        actorEnabled: { type: 'boolean' },
+        leaseMs: { type: 'integer', minimum: 1000, maximum: 3600000 },
+        batchSize: { type: 'integer', minimum: 1, maximum: 10000 },
       },
     },
-    rawEvidenceEnabled: { type: 'boolean' },
+    rawEvidenceEnabled: { const: false },
+    registration: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['allowedRoots', 'bootstrapCacheTtlMs'],
+      properties: {
+        allowedRoots: { $ref: 'https://ghost-records.dev/schemas/rdap-allowed-roots.json' },
+        bootstrapCacheTtlMs: { type: 'integer', minimum: 60000, maximum: 604800000 },
+      },
+    },
     providerCredentialReferences: {
       $ref: 'https://ghost-records.dev/schemas/provider-credential-references.json',
     },

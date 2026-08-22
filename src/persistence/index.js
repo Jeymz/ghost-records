@@ -8,6 +8,8 @@ import {
   rollbackLastMigration,
   runMigrations,
 } from './migrations/runner.js';
+import { createHistoricalEvidenceService } from '../history/historical-evidence-service.js';
+import { runHistoricalEvidenceRetention } from '../retention/historical-evidence-retention.js';
 import { initializePersistenceModels } from './models/index.js';
 
 export function createPersistenceLayer(configuration, dependencies = {}) {
@@ -17,6 +19,17 @@ export function createPersistenceLayer(configuration, dependencies = {}) {
   return Object.freeze({
     sequelize,
     models,
+    historicalEvidence: () => createHistoricalEvidenceService({
+      persistence: { sequelize, models },
+    }),
+    runRetention: ({ actorId, logger, now }) =>
+      runHistoricalEvidenceRetention({
+        configuration,
+        persistence: { sequelize, models },
+        actorId,
+        logger,
+        ...(now ? { now } : {}),
+      }),
     checkReadiness: () => checkDatabaseReadiness(sequelize),
     close: () => closeSequelizeClient(sequelize),
     runMigrations: ({ actorId, logger, manifest = migrations }) =>
